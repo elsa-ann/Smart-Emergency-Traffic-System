@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 7
+names: ['ambulance', 'bunch of motorcycle', 'bus', 'cars', 'd', 'motorcycle', 'truck']
+
+roboflow:
+  workspace: rizky-anugrah-ananto
+  project: bandung-buah-batu-cctv-traffic
+  version: 9
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/rizky-anugrah-ananto/bandung-buah-batu-cctv-traffic/dataset/9

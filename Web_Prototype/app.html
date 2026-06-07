@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Emergency Corridor System</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#050b12;--panel:#080f18;--panel2:#0c1620;
+  --border:#0e3a5c;--border2:#1a5c8a;
+  --accent:#00c8ff;--accent2:#00ff9d;
+  --red:#ff3b3b;--warn:#ffb800;--emergency:#ff4500;
+  --text:#c8e8f8;--text2:#5a9abf;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:14px;overflow:hidden;height:100vh;}
+header{background:var(--panel);border-bottom:1px solid var(--border);padding:8px 20px;display:flex;align-items:center;justify-content:space-between;z-index:100;}
+.logo{font-family:'Orbitron',monospace;font-size:14px;font-weight:900;color:var(--accent);letter-spacing:2px;text-shadow:0 0 20px rgba(0,200,255,0.5);}
+.logo span{color:var(--accent2);}
+.hstatus{display:flex;gap:16px;align-items:center;}
+.sdot{display:flex;align-items:center;gap:5px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text2);}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--accent2);box-shadow:0 0 6px var(--accent2);animation:pulse 2s infinite;}
+.dot.red{background:var(--red);box-shadow:0 0 6px var(--red);}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(0.8)}}
+
+.layout{display:grid;grid-template-columns:190px 1fr 260px;height:calc(100vh - 45px);gap:1px;background:var(--border);}
+
+/* LEFT */
+.left{background:var(--panel);padding:12px;overflow-y:auto;}
+.ptitle{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text2);letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;}
+.ptitle::before{content:'';width:3px;height:9px;background:var(--accent);flex-shrink:0;}
+.vbtn{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:8px;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;transition:all 0.2s;margin-bottom:4px;}
+.vbtn:hover,.vbtn.sel{border-color:var(--accent);background:rgba(0,200,255,0.08);color:var(--accent);}
+.vbtn.emg{border-color:rgba(255,69,0,0.4);}
+.vbtn.emg:hover,.vbtn.emg.sel{border-color:var(--emergency);background:rgba(255,69,0,0.08);color:var(--emergency);}
+.vbtn .vi{font-size:17px;}
+.vbtn small{display:block;font-size:9px;color:var(--text2);font-weight:400;}
+.pbtn{width:100%;background:transparent;border:1px solid var(--border);color:var(--text2);padding:5px 8px;border-radius:3px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;transition:all 0.2s;text-align:left;margin-bottom:3px;}
+.pbtn:hover{border-color:var(--accent2);color:var(--accent2);}
+.clrbtn{width:100%;background:transparent;border:1px solid var(--border);color:var(--text2);padding:5px;border-radius:3px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:9px;transition:all 0.2s;margin-top:4px;}
+.clrbtn:hover{border-color:var(--red);color:var(--red);}
+.vcnt{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+.vc{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text2);display:flex;align-items:center;gap:2px;}
+.dbadge{display:inline-block;font-family:'Share Tech Mono',monospace;font-size:9px;padding:2px 7px;border-radius:2px;margin-top:5px;}
+.dl{background:rgba(0,255,157,0.1);color:var(--accent2);border:1px solid rgba(0,255,157,0.3);}
+.dm{background:rgba(255,184,0,0.1);color:var(--warn);border:1px solid rgba(255,184,0,0.3);}
+.dh{background:rgba(255,59,59,0.1);color:var(--red);border:1px solid rgba(255,59,59,0.3);}
+
+/* Speed control */
+.speed-wrap{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+.speed-label{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text2);letter-spacing:2px;margin-bottom:6px;display:flex;justify-content:space-between;}
+input[type=range]{width:100%;accent-color:var(--accent);height:4px;cursor:pointer;}
+
+/* CENTER */
+.center{background:var(--panel);display:flex;flex-direction:column;align-items:center;padding:12px;position:relative;}
+#sim-canvas{border:1px solid var(--border);border-radius:4px;cursor:crosshair;max-width:100%;max-height:calc(100vh - 120px);}
+.cinfo{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text2);margin-top:5px;text-align:center;}
+.scan-btn{background:linear-gradient(135deg,#004d7a,#007ab8);border:1px solid var(--accent);color:var(--accent);padding:9px;border-radius:3px;cursor:pointer;font-family:'Orbitron',monospace;font-size:10px;font-weight:700;letter-spacing:2px;transition:all 0.3s;width:100%;margin-top:8px;}
+.scan-btn:hover{box-shadow:0 0 20px rgba(0,200,255,0.3);transform:translateY(-1px);}
+
+/* RIGHT */
+.right{display:flex;flex-direction:column;gap:1px;background:var(--border);overflow-y:auto;}
+.rpanel{background:var(--panel);padding:11px;}
+.cctv-feed{background:#020608;border:1px solid var(--border);border-radius:3px;height:75px;position:relative;overflow:hidden;margin-bottom:8px;}
+.cc{position:absolute;width:10px;height:10px;border-color:var(--accent2);border-style:solid;opacity:0.7;}
+.cc.tl{top:3px;left:3px;border-width:2px 0 0 2px}.cc.tr{top:3px;right:3px;border-width:2px 2px 0 0}
+.cc.bl{bottom:3px;left:3px;border-width:0 0 2px 2px}.cc.br{bottom:3px;right:3px;border-width:0 2px 2px 0}
+.cscan{position:absolute;width:100%;height:2px;background:linear-gradient(transparent,rgba(0,200,255,0.4),transparent);animation:scan 2s linear infinite;}
+@keyframes scan{from{top:-2px}to{top:100%}}
+.cov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;}
+.ct{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text2);letter-spacing:1px;}
+.crec{position:absolute;top:4px;right:7px;font-family:'Share Tech Mono',monospace;font-size:7px;color:var(--red);display:flex;align-items:center;gap:3px;}
+.crec::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--red);animation:pulse 1s infinite;}
+.dbox{background:var(--panel2);border:1px solid var(--border);border-radius:3px;padding:6px 9px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;}
+.dlbl{font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text2);letter-spacing:1px;}
+.dval{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--accent);font-weight:700;}
+.dval.alert{color:var(--emergency);text-shadow:0 0 8px var(--emergency);}
+.dval.safe{color:var(--accent2);}
+.cbw{margin:5px 0;}
+.cbl{display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text2);margin-bottom:3px;}
+.cbb{height:5px;background:var(--panel2);border:1px solid var(--border);border-radius:2px;overflow:hidden;}
+.cbf{height:100%;width:0%;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:2px;transition:width 0.5s;}
+.cbf.danger{background:linear-gradient(90deg,var(--warn),var(--red));}
+.ri{background:var(--panel2);border-left:2px solid var(--border2);padding:5px 9px;margin-bottom:4px;border-radius:0 3px 3px 0;font-family:'Share Tech Mono',monospace;font-size:9px;opacity:0.4;transition:all 0.4s;}
+.ri.active{border-left-color:var(--accent2);opacity:1;color:var(--accent2);}
+.ri.fail{border-left-color:var(--red);opacity:1;color:var(--red);}
+.rl{color:var(--text2);font-size:8px;letter-spacing:1px;margin-bottom:1px;}
+.rres{margin-top:5px;background:rgba(0,200,255,0.04);border:1px solid var(--border2);border-radius:3px;padding:6px;font-family:'Share Tech Mono',monospace;font-size:10px;text-align:center;color:var(--text2);transition:all 0.4s;}
+.rres.active{color:var(--accent);border-color:var(--accent);background:rgba(0,200,255,0.07);}
+.rres.fail{color:var(--red);border-color:var(--red);}
+.ps{list-style:none;}
+.pi{display:flex;align-items:flex-start;gap:7px;padding:4px 0;border-bottom:1px solid rgba(14,58,92,0.4);opacity:0.35;transition:all 0.4s;}
+.pi:last-child{border-bottom:none;}
+.pi.active{opacity:1;}
+.pnum{width:16px;height:16px;border:1px solid var(--border2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text2);flex-shrink:0;margin-top:1px;transition:all 0.4s;}
+.pi.active .pnum{border-color:var(--accent2);color:var(--accent2);background:rgba(0,255,157,0.1);box-shadow:0 0 6px rgba(0,255,157,0.3);}
+.pt{font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:500;line-height:1.3;}
+.pt small{display:block;font-size:9px;color:var(--text2);}
+.gr{background:var(--panel2);border:1px solid var(--border);border-radius:3px;padding:6px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;transition:all 0.3s;}
+.gr.ok{border-color:rgba(0,255,157,0.3);}
+.gr.warn{border-color:rgba(255,184,0,0.3);}
+.gr.fail{border-color:rgba(255,59,59,0.3);}
+.grn{font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text2);letter-spacing:1px;}
+.grv{font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;color:var(--text);margin-top:1px;}
+.gb{font-family:'Share Tech Mono',monospace;font-size:8px;padding:2px 5px;border-radius:2px;background:rgba(0,255,157,0.1);color:var(--accent2);border:1px solid rgba(0,255,157,0.3);letter-spacing:1px;white-space:nowrap;}
+.gb.warn{background:rgba(255,184,0,0.1);color:var(--warn);border-color:rgba(255,184,0,0.3);}
+.gb.fail{background:rgba(255,59,59,0.1);color:var(--red);border-color:rgba(255,59,59,0.3);}
+.ovrbtn{width:100%;background:transparent;border:1px solid var(--border2);color:var(--text2);padding:6px;border-radius:3px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;transition:all 0.2s;margin-top:3px;}
+.ovrbtn:hover{border-color:var(--warn);color:var(--warn);}
+.ovrbtn.active{border-color:var(--warn);color:var(--warn);background:rgba(255,184,0,0.07);}
+
+/* Emergency banner */
+.ebanner{display:none;position:fixed;top:45px;left:0;right:0;background:var(--emergency);color:white;text-align:center;padding:5px;font-family:'Orbitron',monospace;font-size:11px;font-weight:700;letter-spacing:3px;z-index:200;animation:blink 0.7s infinite;}
+.ebanner.show{display:block;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.65}}
+
+/* CCTV popup */
+.cctv-popup{position:fixed;background:var(--panel);border:1px solid var(--accent);border-radius:6px;padding:14px;z-index:500;min-width:220px;box-shadow:0 0 30px rgba(0,200,255,0.2);display:none;}
+.cctv-popup.show{display:block;}
+.popup-title{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:2px;margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:6px;}
+.popup-row{display:flex;justify-content:space-between;margin-bottom:5px;font-family:'Share Tech Mono',monospace;font-size:10px;}
+.popup-key{color:var(--text2);}
+.popup-val{color:var(--text);font-weight:700;}
+.popup-val.alert{color:var(--emergency);}
+.popup-val.ok{color:var(--accent2);}
+.popup-close{position:absolute;top:8px;right:10px;background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;}
+
+/* Toast */
+.twrap{position:fixed;bottom:16px;right:16px;display:flex;flex-direction:column;gap:6px;z-index:300;}
+.toast{background:var(--panel2);border:1px solid var(--border2);padding:8px 11px;border-radius:3px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text);box-shadow:0 4px 16px rgba(0,0,0,0.5);animation:slideIn 0.3s ease;max-width:240px;}
+.toast.success{border-color:rgba(0,255,157,0.5);color:var(--accent2);}
+.toast.danger{border-color:rgba(255,59,59,0.5);color:var(--red);}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">SECS <span>//</span> Smart Emergency Corridor System</div>
+  <div class="hstatus">
+    <div class="sdot"><div class="dot"></div> SYSTEM ONLINE</div>
+    <div class="sdot"><div class="dot"></div> AI READY</div>
+    <div class="sdot" id="ehdr" style="display:none"><div class="dot red"></div> EMERGENCY MODE</div>
+  </div>
+</header>
+<div class="ebanner" id="ebanner">⚠ EMERGENCY CORRIDOR ACTIVE — PRIORITY LANE OPEN ⚠</div>
+
+<!-- CCTV Popup -->
+<div class="cctv-popup" id="cctv-popup">
+  <button class="popup-close" onclick="closePopup()">✕</button>
+  <div class="popup-title" id="popup-title">📷 CAM-N — LIVE FEED</div>
+  <div class="popup-row"><span class="popup-key">STATUS</span><span class="popup-val ok" id="pp-status">SCANNING</span></div>
+  <div class="popup-row"><span class="popup-key">DETECTED</span><span class="popup-val" id="pp-detected">—</span></div>
+  <div class="popup-row"><span class="popup-key">DISTANCE</span><span class="popup-val" id="pp-dist">—</span></div>
+  <div class="popup-row"><span class="popup-key">CONFIDENCE</span><span class="popup-val" id="pp-conf">—</span></div>
+  <div class="popup-row"><span class="popup-key">VEHICLE COUNT</span><span class="popup-val" id="pp-vcount">—</span></div>
+  <div class="popup-row"><span class="popup-key">TRAFFIC DENSITY</span><span class="popup-val" id="pp-density">—</span></div>
+  <div class="popup-row"><span class="popup-key">AI DECISION</span><span class="popup-val" id="pp-decision">AWAITING</span></div>
+</div>
+
+<div class="layout">
+  <!-- LEFT -->
+  <div class="left">
+    <div class="ptitle">VEHICLE SPAWN</div>
+    <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text2);margin-bottom:7px;letter-spacing:1px">SELECT → CLICK ROAD</div>
+    <button class="vbtn sel" id="btn-car" onclick="selType('car')"><span class="vi">🚗</span><div>Car<small>Regular vehicle</small></div></button>
+    <button class="vbtn" id="btn-bus" onclick="selType('bus')"><span class="vi">🚌</span><div>Bus<small>Large vehicle</small></div></button>
+    <button class="vbtn" id="btn-truck" onclick="selType('truck')"><span class="vi">🚛</span><div>Truck<small>Heavy vehicle</small></div></button>
+    <button class="vbtn emg" id="btn-ambulance" onclick="selType('ambulance')"><span class="vi">🚑</span><div>Ambulance<small>HIGH PRIORITY</small></div></button>
+    <button class="vbtn emg" id="btn-firetruck" onclick="selType('firetruck')"><span class="vi">🚒</span><div>Fire Truck<small>HIGH PRIORITY</small></div></button>
+
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+      <div class="ptitle">PRESETS</div>
+      <button class="pbtn" onclick="preset('empty')">◻ ROAD CLEAR</button>
+      <button class="pbtn" onclick="preset('light')">◈ LIGHT TRAFFIC</button>
+      <button class="pbtn" onclick="preset('heavy')">◉ HEAVY TRAFFIC</button>
+      <button class="pbtn" onclick="preset('jam')">⬛ TRAFFIC JAM</button>
+      <button class="clrbtn" onclick="clearAll()">✕ CLEAR ALL</button>
+    </div>
+
+    <div class="speed-wrap">
+      <div class="ptitle">SIMULATION SPEED</div>
+      <div class="speed-label"><span>SPEED</span><span id="spd-lbl">1.0×</span></div>
+      <input type="range" id="spd-slider" min="1" max="10" value="3" oninput="updateSpeed(this.value)">
+      <div style="display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--border2);margin-top:2px"><span>SLOW</span><span>FAST</span></div>
+    </div>
+
+    <div class="vcnt">
+      <div class="vc">🚗<span id="cnt-car">0</span></div>
+      <div class="vc">🚌<span id="cnt-bus">0</span></div>
+      <div class="vc">🚛<span id="cnt-truck">0</span></div>
+      <div class="vc">🚑<span id="cnt-amb">0</span></div>
+      <div class="vc">🚒<span id="cnt-fire">0</span></div>
+    </div>
+    <div style="margin-top:6px"><div class="dbadge dl" id="dbadge">DENSITY: —</div></div>
+    <div style="margin-top:6px;font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text2)">
+      💡 Klik ikon 📷 untuk lihat data CCTV
+    </div>
+  </div>
+
+  <!-- CENTER -->
+  <div class="center">
+    <div class="ptitle" style="align-self:flex-start;width:100%;margin-bottom:8px">INTERSECTION SIMULATION — 1000m VIEW</div>
+    <canvas id="sim-canvas"></canvas>
+    <div class="cinfo">Pilih kendaraan → klik jalan untuk tambah · Klik kanan hapus · Drag pindah · Klik 📷 untuk data CCTV</div>
+    <button class="scan-btn" id="scan-btn" onclick="startScan()">▶ ACTIVATE CCTV DETECTION</button>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right">
+    <div class="rpanel">
+      <div class="ptitle">CCTV DETECTION</div>
+      <div class="cctv-feed">
+        <div class="cc tl"></div><div class="cc tr"></div><div class="cc bl"></div><div class="cc br"></div>
+        <div class="cscan"></div>
+        <div class="cov"><div class="ct" id="cctv-main">SCANNING...</div><div class="ct" id="cctv-sub" style="color:var(--border2)">FEED ACTIVE</div></div>
+        <div class="crec">REC</div>
+      </div>
+      <div class="dbox">
+        <div><div class="dlbl">DETECTED</div><div class="dval" id="det-v">—</div></div>
+        <div style="text-align:right"><div class="dlbl">DISTANCE</div><div class="dval" id="det-d">—</div></div>
+      </div>
+      <div class="cbw">
+        <div class="cbl"><span>CONFIDENCE</span><span id="conf-pct">0%</span></div>
+        <div class="cbb"><div class="cbf" id="conf-bar"></div></div>
+      </div>
+      <div class="dbox">
+        <div><div class="dlbl">TOTAL VEHICLES</div><div class="dval" id="det-total">0</div></div>
+        <div style="text-align:right"><div class="dlbl">TRAFFIC STATE</div><div class="dval" id="det-traffic">—</div></div>
+      </div>
+    </div>
+
+    <div class="rpanel">
+      <div class="ptitle">AI REASONING ENGINE</div>
+      <div class="ri" id="rule1"><div class="rl">RULE 01</div>Emergency Vehicle Detected?</div>
+      <div class="ri" id="rule2"><div class="rl">RULE 02</div>Distance &lt; 500m?</div>
+      <div class="ri" id="rule3"><div class="rl">RULE 03</div>Confidence &gt; 85%?</div>
+      <div class="ri" id="rule4"><div class="rl">RULE 04</div>Traffic Density Check</div>
+      <div class="rres" id="rule-res">AWAITING SCAN...</div>
+    </div>
+
+    <div class="rpanel">
+      <div class="ptitle">PLANNING ENGINE</div>
+      <ul class="ps">
+        <li class="pi" id="plan1"><div class="pnum">1</div><div class="pt">Activate Emergency Mode<small>Override traffic cycle</small></div></li>
+        <li class="pi" id="plan2"><div class="pnum">2</div><div class="pt">Open Priority Lane<small>Turn emergency lane GREEN</small></div></li>
+        <li class="pi" id="plan3"><div class="pnum">3</div><div class="pt">Stop Cross Traffic<small>Hold all other lanes RED</small></div></li>
+        <li class="pi" id="plan4"><div class="pnum">4</div><div class="pt">Display Emergency Symbol<small>Notify other drivers</small></div></li>
+        <li class="pi" id="plan5"><div class="pnum">5</div><div class="pt">Restore Normal Cycle<small>After vehicle passes</small></div></li>
+      </ul>
+    </div>
+
+    <div class="rpanel">
+      <div class="ptitle">ETHICAL GUARDRAILS</div>
+      <div class="gr" id="g-conf">
+        <div><div class="grn">CONFIDENCE THRESHOLD</div><div class="grv" id="g-conf-val">—</div></div>
+        <div class="gb" id="g-conf-badge">PENDING</div>
+      </div>
+      <div class="gr" id="g-multi">
+        <div><div class="grn">MULTI-EMERGENCY CHECK</div><div class="grv" id="g-multi-val">—</div></div>
+        <div class="gb" id="g-multi-badge">PENDING</div>
+      </div>
+      <div class="gr ok">
+        <div><div class="grn">MAX GREEN DURATION</div><div class="grv">45 sec limit</div></div>
+        <div class="gb">ENFORCED</div>
+      </div>
+      <button class="ovrbtn" id="ovrbtn" onclick="toggleOverride()">⚠ HUMAN OVERRIDE</button>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text2);margin-top:4px;text-align:center" id="ovr-status">Override: INACTIVE</div>
+    </div>
+  </div>
+</div>
+<div class="twrap" id="twrap"></div>
+
+<script>
+// ── CANVAS SETUP ────────────────────────────────────────────────
+const canvas = document.getElementById('sim-canvas');
+const ctx = canvas.getContext('2d');
+
+// Scale canvas to fit center panel
+function resizeCanvas() {
+  const center = canvas.parentElement;
+  const availH = center.clientHeight - 90;
+  const availW = center.clientWidth - 24;
+  // Keep aspect ratio 520:700
+  const ratio = 520/700;
+  let h = availH, w = h * ratio;
+  if(w > availW) { w = availW; h = w / ratio; }
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  canvas.width = 520;
+  canvas.height = 700;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+const W = canvas.width, H = canvas.height;
+// Intersection is at CENTER of canvas
+const CX = W/2, CY = H/2;
+const ROAD_W = 80;
+
+// Scale: canvas H=700 represents 1000 meters
+// Intersection at center (350px) = 500m from top
+const PX_PER_M = H / 1000; // 0.7px per meter
+
+// CCTV detection zone: 500m from intersection
+// Top CCTV: at y = CY - 500*PX_PER_M = CY - 350 = 0  → top edge
+// Bottom CCTV: at y = CY + 350 = H → bottom edge
+// We'll place visible CCTV markers at ±350px from center
+const CCTV_DIST_PX = Math.round(500 * PX_PER_M); // 350px
+
+// ── STATE ───────────────────────────────────────────────────────
+let vehicles = [], selectedType = 'car';
+let dragging = null, dragOffX = 0, dragOffY = 0;
+let isEmergency = false, emergencyV = null, humanOverride = false, scanning = false;
+let tlState = 0, tlTimer = 0, lastTime = 0;
+let scanTOs = [];
+let speedMult = 0.4; // actual speed multiplier (slider 1-10 → 0.2–2.0)
+
+const EMOJI  = {car:'🚗',bus:'🚌',truck:'🚛',ambulance:'🚑',firetruck:'🚒'};
+const ESIZE  = {car:19,bus:22,truck:24,ambulance:21,firetruck:23};
+const IS_EMG = {car:false,bus:false,truck:false,ambulance:true,firetruck:true};
+// Base speeds in px/frame at 60fps
+const BASE_SPD = {car:0.9,bus:0.6,truck:0.5,ambulance:1.4,firetruck:1.3};
+
+// ── CCTV CAMERA POSITIONS (clickable) ───────────────────────────
+// 4 cameras: one per road approach, ~500m from intersection
+const CCTV_CAMS = [
+  {id:'CAM-N', x: CX - ROAD_W/2 - 20, y: CY - CCTV_DIST_PX, dir:'ns', label:'CAM-N'},
+  {id:'CAM-S', x: CX + ROAD_W/2 + 4,  y: CY + CCTV_DIST_PX - 14, dir:'ns', label:'CAM-S'},
+  {id:'CAM-W', x: CX - CCTV_DIST_PX,  y: CY - ROAD_W/2 - 20, dir:'ew', label:'CAM-W'},
+  {id:'CAM-E', x: CX + CCTV_DIST_PX - 14, y: CY - ROAD_W/2 - 20, dir:'ew', label:'CAM-E'},
+];
+
+// ── DISTANCE MARKERS ────────────────────────────────────────────
+const DIST_MARKERS = [
+  {y: CY - CCTV_DIST_PX, label:'500m — CCTV DETECTION ZONE'},
+  {y: CY - Math.round(300*PX_PER_M), label:'300m'},
+  {y: CY - Math.round(100*PX_PER_M), label:'100m'},
+  {y: CY + Math.round(100*PX_PER_M), label:'100m'},
+  {y: CY + Math.round(300*PX_PER_M), label:'300m'},
+  {y: CY + CCTV_DIST_PX, label:'500m — CCTV DETECTION ZONE'},
+];
+
+// ── SPAWN ────────────────────────────────────────────────────────
+function getSpawnPos(dir) {
+  const lo = Math.random()>0.5 ? -1 : 1;
+  const lx = CX + lo*(ROAD_W/4);
+  const ly = CY + lo*(ROAD_W/4);
+  // Spawn beyond 600m (at edge ~420px from center)
+  const spawnDist = Math.round((650 + Math.random()*200) * PX_PER_M);
+  switch(dir) {
+    case 'S': return {x:lx, y:CY - spawnDist, dir:'S'};
+    case 'N': return {x:lx, y:CY + spawnDist, dir:'N'};
+    case 'E': return {x:CX - spawnDist, y:ly, dir:'E'};
+    case 'W': return {x:CX + spawnDist, y:ly, dir:'W'};
+  }
+}
+
+function stopPos(dir) {
+  const g=10;
+  switch(dir) {
+    case 'S': return CY - ROAD_W/2 - g;
+    case 'N': return CY + ROAD_W/2 + g;
+    case 'E': return CX - ROAD_W/2 - g;
+    case 'W': return CX + ROAD_W/2 + g;
+  }
+}
+
+function isNS(dir){return dir==='N'||dir==='S';}
+
+function canPass(dir) {
+  if(isEmergency&&!humanOverride) {
+    if(!emergencyV) return false;
+    const ed = isNS(emergencyV.dir)?'ns':'ew';
+    return isNS(dir) ? ed==='ns' : ed==='ew';
+  }
+  return isNS(dir) ? tlState===0 : tlState===1;
+}
+
+function spawnV(type, dir) {
+  const p = getSpawnPos(dir);
+  vehicles.push({type,x:p.x,y:p.y,dir:p.dir,state:'moving',id:Date.now()+Math.random()});
+  updateUI();
+}
+
+function addVehicle(type) {
+  const dirs=['S','N','E','W'];
+  spawnV(type, dirs[Math.floor(Math.random()*4)]);
+  showToast(`${EMOJI[type]} ${type.toUpperCase()} spawned`,'success');
+}
+
+function selType(t) {
+  selectedType=t;
+  document.querySelectorAll('.vbtn').forEach(b=>b.classList.remove('sel'));
+  document.getElementById('btn-'+t).classList.add('sel');
+}
+
+function clearAll(){vehicles=[];resetScan();updateUI();}
+
+function preset(p) {
+  clearAll();
+  const cfg={
+    light:[['car','S'],['car','N'],['bus','E']],
+    heavy:[['car','S'],['car','S'],['bus','N'],['truck','E'],['car','E'],['car','W'],['bus','W'],['truck','N']],
+    jam:Array.from({length:18},(_,i)=>['car',['S','N','E','W'][i%4]])
+  };
+  (cfg[p]||[]).forEach(([t,d])=>spawnV(t,d));
+}
+
+function updateSpeed(v) {
+  speedMult = v / 7.5; // slider 1-10 → ~0.13–1.33
+  document.getElementById('spd-lbl').textContent = (v/3).toFixed(1)+'×';
+}
+
+function updateUI() {
+  ['car','bus','truck','ambulance','firetruck'].forEach(t=>{
+    const id=t==='ambulance'?'amb':t==='firetruck'?'fire':t;
+    document.getElementById('cnt-'+id).textContent=vehicles.filter(v=>v.type===t).length;
+  });
+  const n=vehicles.length;
+  const [label,cls]=n===0?['CLEAR','l']:n<=3?['LOW','l']:n<=8?['MEDIUM','m']:n<=14?['HIGH','h']:['JAM','h'];
+  const b=document.getElementById('dbadge');
+  b.textContent=`DENSITY: ${label} (${n})`;
+  b.className='dbadge d'+cls;
+  document.getElementById('det-total').textContent=n;
+}
+
+// ── UPDATE VEHICLES ──────────────────────────────────────────────
+function updateVehicles(dt) {
+  const toRm=[];
+  vehicles.forEach((v,i)=>{
+    const spd = BASE_SPD[v.type] * speedMult * (dt/16);
+    const stop = stopPos(v.dir);
+    const emg = IS_EMG[v.type];
+    const pass = canPass(v.dir) || (emg&&isEmergency&&!humanOverride);
+
+    if(v.state==='moving') {
+      switch(v.dir) {
+        case 'S':
+          if(!pass && v.y+spd>=stop-2){v.y=Math.min(v.y+spd,stop);if(v.y>=stop)v.state='stopped';}
+          else{v.y+=spd;if(v.y>H+40)toRm.push(i);}
+          break;
+        case 'N':
+          if(!pass && v.y-spd<=stop+2){v.y=Math.max(v.y-spd,stop);if(v.y<=stop)v.state='stopped';}
+          else{v.y-=spd;if(v.y<-40)toRm.push(i);}
+          break;
+        case 'E':
+          if(!pass && v.x+spd>=stop-2){v.x=Math.min(v.x+spd,stop);if(v.x>=stop)v.state='stopped';}
+          else{v.x+=spd;if(v.x>W+40)toRm.push(i);}
+          break;
+        case 'W':
+          if(!pass && v.x-spd<=stop+2){v.x=Math.max(v.x-spd,stop);if(v.x<=stop)v.state='stopped';}
+          else{v.x-=spd;if(v.x<-40)toRm.push(i);}
+          break;
+      }
+    } else if(v.state==='stopped') {
+      if(pass) v.state='moving';
+    }
+  });
+  for(let i=toRm.length-1;i>=0;i--) vehicles.splice(toRm[i],1);
+  updateUI();
+}
+
+// ── DRAW ─────────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#060e18'; ctx.fillRect(0,0,W,H);
+
+  // Grid dots
+  ctx.fillStyle='rgba(14,58,92,0.2)';
+  for(let gx=20;gx<W;gx+=40) for(let gy=20;gy<H;gy+=40){ctx.beginPath();ctx.arc(gx,gy,1,0,Math.PI*2);ctx.fill();}
+
+  // Roads
+  ctx.fillStyle='#10202e';
+  ctx.fillRect(CX-ROAD_W/2,0,ROAD_W,H);
+  ctx.fillRect(0,CY-ROAD_W/2,W,ROAD_W);
+
+  // Road edges
+  ctx.strokeStyle='rgba(0,200,255,0.15)'; ctx.lineWidth=1; ctx.setLineDash([]);
+  const edges=[
+    [CX-ROAD_W/2,0,CX-ROAD_W/2,CY-ROAD_W/2],[CX+ROAD_W/2,0,CX+ROAD_W/2,CY-ROAD_W/2],
+    [CX-ROAD_W/2,CY+ROAD_W/2,CX-ROAD_W/2,H],[CX+ROAD_W/2,CY+ROAD_W/2,CX+ROAD_W/2,H],
+    [0,CY-ROAD_W/2,CX-ROAD_W/2,CY-ROAD_W/2],[0,CY+ROAD_W/2,CX-ROAD_W/2,CY+ROAD_W/2],
+    [CX+ROAD_W/2,CY-ROAD_W/2,W,CY-ROAD_W/2],[CX+ROAD_W/2,CY+ROAD_W/2,W,CY+ROAD_W/2]
+  ];
+  edges.forEach(([x1,y1,x2,y2])=>{ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();});
+
+  // Center dashes
+  ctx.strokeStyle='rgba(255,200,0,0.15)'; ctx.setLineDash([10,10]);
+  [[CX,0,CX,CY-ROAD_W/2],[CX,CY+ROAD_W/2,CX,H],[0,CY,CX-ROAD_W/2,CY],[CX+ROAD_W/2,CY,W,CY]]
+    .forEach(([x1,y1,x2,y2])=>{ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();});
+  ctx.setLineDash([]);
+
+  // Distance markers
+  DIST_MARKERS.forEach(m=>{
+    const isCCTV = m.label.includes('CCTV');
+    ctx.strokeStyle = isCCTV ? 'rgba(255,184,0,0.25)' : 'rgba(0,200,255,0.1)';
+    ctx.lineWidth=1; ctx.setLineDash(isCCTV?[6,4]:[3,8]);
+    ctx.beginPath(); ctx.moveTo(0,m.y); ctx.lineTo(W,m.y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font='7px Share Tech Mono,monospace';
+    ctx.fillStyle = isCCTV ? 'rgba(255,184,0,0.5)' : 'rgba(0,200,255,0.3)';
+    ctx.textAlign='left'; ctx.textBaseline='bottom';
+    ctx.fillText(m.label, 4, m.y-2);
+  });
+
+  // Intersection box
+  ctx.fillStyle='#0b1c2c'; ctx.fillRect(CX-ROAD_W/2,CY-ROAD_W/2,ROAD_W,ROAD_W);
+  ctx.strokeStyle='rgba(0,100,180,0.3)'; ctx.lineWidth=1;
+  ctx.strokeRect(CX-ROAD_W/2,CY-ROAD_W/2,ROAD_W,ROAD_W);
+
+  // Stop lines
+  ctx.strokeStyle='rgba(255,255,255,0.22)'; ctx.lineWidth=2;
+  const sl=5;
+  ctx.beginPath();ctx.moveTo(CX-ROAD_W/2,CY-ROAD_W/2-sl);ctx.lineTo(CX+ROAD_W/2,CY-ROAD_W/2-sl);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(CX-ROAD_W/2,CY+ROAD_W/2+sl);ctx.lineTo(CX+ROAD_W/2,CY+ROAD_W/2+sl);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(CX-ROAD_W/2-sl,CY-ROAD_W/2);ctx.lineTo(CX-ROAD_W/2-sl,CY+ROAD_W/2);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(CX+ROAD_W/2+sl,CY-ROAD_W/2);ctx.lineTo(CX+ROAD_W/2+sl,CY+ROAD_W/2);ctx.stroke();
+  ctx.lineWidth=1;
+
+  // Emergency corridor glow
+  if(isEmergency&&!humanOverride&&emergencyV) {
+    const nsEmg=isNS(emergencyV.dir);
+    if(nsEmg){
+      const g=ctx.createLinearGradient(CX-ROAD_W/2,0,CX+ROAD_W/2,0);
+      g.addColorStop(0,'rgba(0,255,100,0)');g.addColorStop(.5,'rgba(0,255,100,0.1)');g.addColorStop(1,'rgba(0,255,100,0)');
+      ctx.fillStyle=g;ctx.fillRect(CX-ROAD_W/2,0,ROAD_W,H);
+    } else {
+      const g=ctx.createLinearGradient(0,CY-ROAD_W/2,0,CY+ROAD_W/2);
+      g.addColorStop(0,'rgba(0,255,100,0)');g.addColorStop(.5,'rgba(0,255,100,0.1)');g.addColorStop(1,'rgba(0,255,100,0)');
+      ctx.fillStyle=g;ctx.fillRect(0,CY-ROAD_W/2,W,ROAD_W);
+    }
+  }
+
+  // Traffic lights
+  drawTLs();
+
+  // CCTV cameras (clickable)
+  CCTV_CAMS.forEach(cam=>{
+    ctx.font='14px serif';
+    ctx.textAlign='left';ctx.textBaseline='top';
+    ctx.fillText('📷',cam.x,cam.y);
+    ctx.font='6px Share Tech Mono,monospace';
+    ctx.fillStyle='rgba(255,184,0,0.6)';
+    ctx.fillText(cam.label,cam.x,cam.y+15);
+
+    // Detection range circle (faint)
+    if(isEmergency&&!humanOverride) {
+      ctx.strokeStyle='rgba(255,69,0,0.12)'; ctx.setLineDash([3,7]);
+      ctx.beginPath(); ctx.arc(cam.x+7,cam.y+7,CCTV_DIST_PX/2,0,Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  });
+
+  // Vehicles
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  vehicles.forEach(v=>{
+    const sz=ESIZE[v.type];
+    ctx.font=sz+'px serif';
+    if(IS_EMG[v.type]&&isEmergency&&!humanOverride){
+      ctx.save();
+      ctx.shadowColor='#ff6600';ctx.shadowBlur=16;
+      ctx.beginPath();ctx.arc(v.x,v.y,sz/2+3,0,Math.PI*2);
+      ctx.strokeStyle='rgba(255,100,0,0.65)';ctx.lineWidth=2;ctx.stroke();
+      ctx.restore();
+    }
+    ctx.fillText(EMOJI[v.type],v.x,v.y);
+  });
+
+  // Emergency center text
+  if(isEmergency&&!humanOverride){
+    const alpha=0.5+0.5*Math.sin(Date.now()/380);
+    ctx.font='bold 9px Orbitron,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=`rgba(255,80,0,${alpha})`;
+    ctx.fillText('⚠ PRIORITY',CX,CY-7);
+    ctx.fillText('ACTIVE',CX,CY+6);
+  }
+}
+
+function drawTLs(){
+  let nsG,ewG;
+  if(isEmergency&&!humanOverride&&emergencyV){
+    nsG=isNS(emergencyV.dir);ewG=!nsG;
+  } else {
+    nsG=tlState===0;ewG=tlState===1;
+  }
+  // Place traffic lights at intersection corners facing oncoming traffic
+  drawTL(CX+ROAD_W/2+5, CY-ROAD_W/2-38, nsG, 'S→');
+  drawTL(CX-ROAD_W/2-22, CY+ROAD_W/2+4, nsG, 'N→');
+  drawTL(CX+ROAD_W/2+4, CY+ROAD_W/2+4, ewG, 'W→');
+  drawTL(CX-ROAD_W/2-22, CY-ROAD_W/2-38, ewG, 'E→');
+}
+
+function drawTL(x,y,green,label){
+  ctx.fillStyle='#08141e';ctx.strokeStyle='rgba(0,200,255,0.3)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.roundRect(x,y,16,38,3);ctx.fill();ctx.stroke();
+  ctx.beginPath();ctx.arc(x+8,y+19,3,0,Math.PI*2);ctx.fillStyle='#0d1c2a';ctx.fill();
+  ctx.beginPath();ctx.arc(x+8,y+8,4.5,0,Math.PI*2);
+  if(!green){ctx.fillStyle='#ff3b3b';ctx.shadowColor='#ff3b3b';ctx.shadowBlur=10;}
+  else{ctx.fillStyle='#1a0000';ctx.shadowBlur=0;}
+  ctx.fill();ctx.shadowBlur=0;
+  ctx.beginPath();ctx.arc(x+8,y+30,4.5,0,Math.PI*2);
+  if(green){ctx.fillStyle='#00ff7f';ctx.shadowColor='#00ff7f';ctx.shadowBlur=10;}
+  else{ctx.fillStyle='#001a00';ctx.shadowBlur=0;}
+  ctx.fill();ctx.shadowBlur=0;
+  ctx.font='6px Share Tech Mono,monospace';ctx.fillStyle='rgba(0,200,255,0.45)';
+  ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(label,x+8,y+39);
+}
+
+// ── CANVAS INTERACTION ────────────────────────────────────────────
+function isInRoad(x,y){
+  return (x>CX-ROAD_W/2&&x<CX+ROAD_W/2)||(y>CY-ROAD_W/2&&y<CY+ROAD_W/2);
+}
+function getRoadDir(x,y){
+  const inNS=x>CX-ROAD_W/2&&x<CX+ROAD_W/2;
+  const inEW=y>CY-ROAD_W/2&&y<CY+ROAD_W/2;
+  if(inNS&&!inEW) return y<CY?'S':'N';
+  if(inEW&&!inNS) return x<CX?'E':'W';
+  return ['S','N','E','W'][Math.floor(Math.random()*4)];
+}
+function getMP(e){
+  const r=canvas.getBoundingClientRect();
+  return{mx:(e.clientX-r.left)*(W/r.width),my:(e.clientY-r.top)*(H/r.height)};
+}
+
+// Check if clicked on CCTV camera
+function checkCCTVClick(mx,my){
+  for(const cam of CCTV_CAMS){
+    if(mx>=cam.x-2&&mx<=cam.x+18&&my>=cam.y-2&&my<=cam.y+18){
+      showCCTVPopup(cam, mx, my);
+      return true;
+    }
+  }
+  return false;
+}
+
+function showCCTVPopup(cam, mx, my){
+  const popup=document.getElementById('cctv-popup');
+  document.getElementById('popup-title').textContent=`📷 ${cam.id} — LIVE FEED`;
+
+  const emgVs=vehicles.filter(v=>IS_EMG[v.type]);
+  const total=vehicles.length;
+  const [densLabel]=getDensLabel(total);
+
+  // Find closest emergency vehicle in this camera's direction
+  let closest=null, closestDist=9999;
+  emgVs.forEach(v=>{
+    const inDir = (cam.dir==='ns' && isNS(v.dir)) || (cam.dir==='ew' && !isNS(v.dir));
+    if(inDir){
+      const d = isNS(v.dir) ? Math.abs(v.y-CY) : Math.abs(v.x-CX);
+      if(d<closestDist){closestDist=d;closest=v;}
+    }
+  });
+
+  const distM = closest ? Math.round(closestDist/PX_PER_M) : null;
+  const conf = closest ? 88+Math.floor(Math.random()*10) : 0;
+
+  document.getElementById('pp-status').textContent = closest ? 'EMERGENCY DETECTED' : 'NORMAL';
+  document.getElementById('pp-status').className = 'popup-val '+(closest?'alert':'ok');
+  document.getElementById('pp-detected').textContent = closest ? `${EMOJI[closest.type]} ${closest.type.toUpperCase()}` : 'No emergency';
+  document.getElementById('pp-detected').className = 'popup-val '+(closest?'alert':'');
+  document.getElementById('pp-dist').textContent = distM ? distM+'m' : '—';
+  document.getElementById('pp-conf').textContent = closest ? conf+'%' : '—';
+  document.getElementById('pp-vcount').textContent = total;
+  document.getElementById('pp-density').textContent = densLabel;
+
+  let decision = '—';
+  if(closest){
+    if(conf>=85 && distM<=500) decision='OPEN_CORRIDOR';
+    else if(closest && conf<85) decision='CAUTION — LOW CONF';
+    else decision='MONITORING';
+  } else {
+    decision='NO ACTION';
+  }
+  document.getElementById('pp-decision').textContent = decision;
+  document.getElementById('pp-decision').className = 'popup-val '+(decision==='OPEN_CORRIDOR'?'alert':decision==='NO ACTION'?'ok':'');
+
+  // Position popup near click
+  const rect=canvas.getBoundingClientRect();
+  const scaleX=rect.width/W, scaleY=rect.height/H;
+  let px=rect.left+mx*scaleX+20;
+  let py=rect.top+my*scaleY-20;
+  if(px+240>window.innerWidth) px=rect.left+mx*scaleX-250;
+  if(py+220>window.innerHeight) py=window.innerHeight-230;
+  popup.style.left=px+'px';
+  popup.style.top=py+'px';
+  popup.classList.add('show');
+}
+
+function closePopup(){document.getElementById('cctv-popup').classList.remove('show');}
+
+canvas.addEventListener('mousedown',e=>{
+  const{mx,my}=getMP(e);
+  if(checkCCTVClick(mx,my)) return;
+  for(let i=vehicles.length-1;i>=0;i--){
+    const v=vehicles[i];const sz=ESIZE[v.type]+5;
+    if(Math.abs(mx-v.x)<sz/2&&Math.abs(my-v.y)<sz/2){dragging=i;dragOffX=mx-v.x;dragOffY=my-v.y;return;}
+  }
+  if(isInRoad(mx,my)){
+    vehicles.push({type:selectedType,x:mx,y:my,dir:getRoadDir(mx,my),state:'moving',id:Date.now()});
+    updateUI();showToast(`${EMOJI[selectedType]} Placed on road`,'success');
+  }
+});
+canvas.addEventListener('mousemove',e=>{
+  if(dragging===null)return;
+  const{mx,my}=getMP(e);
+  vehicles[dragging].x=mx-dragOffX;vehicles[dragging].y=my-dragOffY;
+});
+canvas.addEventListener('mouseup',()=>{dragging=null;});
+canvas.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  const{mx,my}=getMP(e);
+  for(let i=vehicles.length-1;i>=0;i--){
+    const v=vehicles[i];const sz=ESIZE[v.type]+5;
+    if(Math.abs(mx-v.x)<sz/2&&Math.abs(my-v.y)<sz/2){vehicles.splice(i,1);updateUI();return;}
+  }
+});
+// Close popup when clicking elsewhere
+canvas.addEventListener('click',e=>{
+  const{mx,my}=getMP(e);
+  if(!checkCCTVClick(mx,my)) closePopup();
+});
+
+// ── TRAFFIC LIGHT CYCLE ──────────────────────────────────────────
+function updateTL(dt){
+  if(isEmergency)return;
+  tlTimer+=dt;
+  if(tlTimer>5000){tlState=1-tlState;tlTimer=0;}
+}
+
+// ── HELPER ───────────────────────────────────────────────────────
+function getDensLabel(n){
+  if(n===0)return['CLEAR','l'];if(n<=3)return['LOW','l'];
+  if(n<=8)return['MEDIUM','m'];if(n<=14)return['HIGH','h'];
+  return['JAM','h'];
+}
+
+// ── SCAN / AI SEQUENCE ────────────────────────────────────────────
+function clearTOs(){scanTOs.forEach(t=>clearTimeout(t));scanTOs=[];}
+
+function startScan(){
+  if(scanning){resetScan();return;}
+  scanning=true;
+  const btn=document.getElementById('scan-btn');
+  btn.textContent='⏹ STOP DETECTION';
+  btn.style.background='linear-gradient(135deg,#4d0000,#8b0000)';
+  btn.style.borderColor='var(--red)';btn.style.color='var(--red)';
+  clearTOs();
+
+  const emgVs=vehicles.filter(v=>IS_EMG[v.type]);
+  const total=vehicles.length;
+  const[densLabel]=getDensLabel(total);
+  document.getElementById('det-total').textContent=total;
+  document.getElementById('det-traffic').textContent=densLabel;
+  document.getElementById('det-traffic').className='dval '+(total>8?'alert':'safe');
+  document.getElementById('cctv-main').textContent='SCANNING...';
+  document.getElementById('cctv-sub').textContent='AI PROCESSING';
+
+  if(emgVs.length===0){
+    const t=setTimeout(()=>{
+      document.getElementById('cctv-main').textContent='NO EMERGENCY';
+      document.getElementById('cctv-sub').textContent='NORMAL TRAFFIC';
+      document.getElementById('det-v').textContent='None';
+      document.getElementById('det-v').className='dval safe';
+      document.getElementById('det-d').textContent='—';
+      setConf(0);
+      setRule('rule1','fail','NO EMERGENCY VEHICLE');
+      setRule('rule2','inactive','');setRule('rule3','inactive','');
+      setRule('rule4','active','Traffic: '+densLabel);
+      document.getElementById('rule-res').className='rres fail';
+      document.getElementById('rule-res').textContent='NO ACTION REQUIRED';
+      updateGuards(0,0);
+      showToast('✓ No emergency vehicles detected','success');
+      scanning=false;resetBtn();
+    },1200);scanTOs.push(t);return;
+  }
+
+  emergencyV=emgVs[0];
+  const conf=88+Math.floor(Math.random()*10);
+  const distPx = isNS(emergencyV.dir) ? Math.abs(emergencyV.y-CY) : Math.abs(emergencyV.x-CX);
+  const distM = Math.round(distPx/PX_PER_M);
+  const multi=emgVs.length>1;
+
+  const t1=setTimeout(()=>{
+    document.getElementById('cctv-main').textContent=EMOJI[emergencyV.type]+' DETECTED';
+    document.getElementById('cctv-main').style.color='#ff4500';
+    document.getElementById('cctv-sub').textContent=emergencyV.type.toUpperCase();
+    document.getElementById('det-v').textContent=emergencyV.type.toUpperCase();
+    document.getElementById('det-v').className='dval alert';
+    document.getElementById('det-d').textContent=distM+'m';
+    setConf(conf);
+    setRule('rule1','active',EMOJI[emergencyV.type]+' '+emergencyV.type.toUpperCase()+' FOUND');
+  },700);
+  const t2=setTimeout(()=>setRule('rule2',distM<=500?'active':'fail','Distance: '+distM+'m '+(distM<=500?'✓':'— TOO FAR')),1300);
+  const t3=setTimeout(()=>setRule('rule3',conf>=85?'active':'fail','Confidence: '+conf+'% '+(conf>=85?'✓':'— BELOW THRESHOLD')),1900);
+  const t4=setTimeout(()=>setRule('rule4','active','Traffic: '+densLabel),2400);
+  const t5=setTimeout(()=>{
+    if(conf<85||distM>500){
+      document.getElementById('rule-res').className='rres fail';
+      document.getElementById('rule-res').textContent=conf<85?'✕ REJECTED — LOW CONFIDENCE':'✕ REJECTED — VEHICLE TOO FAR';
+      updateGuards(conf,emgVs.length);
+      showToast('⚠ Rejected: '+(conf<85?'confidence too low':'vehicle out of range'),'danger');
+      scanning=false;resetBtn();return;
+    }
+    document.getElementById('rule-res').className='rres active';
+    document.getElementById('rule-res').textContent='✓ EMERGENCY PRIORITY ACTIVATED';
+    updateGuards(conf,emgVs.length);
+    activatePlanning(multi);
+  },3000);
+  scanTOs.push(t1,t2,t3,t4,t5);
+}
+
+function activatePlanning(multi){
+  ['plan1','plan2','plan3','plan4','plan5'].forEach((id,i)=>{
+    const t=setTimeout(()=>{
+      document.getElementById(id).classList.add('active');
+      if(i<=2){
+        isEmergency=true;
+        document.getElementById('ebanner').classList.add('show');
+        document.getElementById('ehdr').style.display='flex';
+      }
+    },i*700);scanTOs.push(t);
+  });
+  const tEnd=setTimeout(()=>{
+    showToast('🚑 CORRIDOR OPEN — '+emergencyV.type.toUpperCase()+' priority active','danger');
+    if(multi)showToast('⚠ Multiple emergency — prioritizing nearest','danger');
+    scanning=false;
+  },5*700+300);
+  scanTOs.push(tEnd);
+}
+
+function resetScan(){
+  clearTOs();scanning=false;isEmergency=false;emergencyV=null;
+  document.getElementById('ebanner').classList.remove('show');
+  document.getElementById('ehdr').style.display='none';
+  document.getElementById('cctv-main').textContent='SCANNING...';
+  document.getElementById('cctv-main').style.color='';
+  document.getElementById('cctv-sub').textContent='FEED ACTIVE';
+  document.getElementById('det-v').textContent='—';document.getElementById('det-v').className='dval';
+  document.getElementById('det-d').textContent='—';
+  document.getElementById('det-traffic').textContent='—';document.getElementById('det-traffic').className='dval';
+  setConf(0);
+  ['rule1','rule2','rule3','rule4'].forEach(id=>setRule(id,'inactive',''));
+  document.getElementById('rule-res').className='rres';
+  document.getElementById('rule-res').textContent='AWAITING SCAN...';
+  ['plan1','plan2','plan3','plan4','plan5'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  ['g-conf','g-multi'].forEach(id=>document.getElementById(id).className='gr');
+  document.getElementById('g-conf-val').textContent='—';document.getElementById('g-multi-val').textContent='—';
+  document.getElementById('g-conf-badge').textContent='PENDING';document.getElementById('g-conf-badge').className='gb';
+  document.getElementById('g-multi-badge').textContent='PENDING';document.getElementById('g-multi-badge').className='gb';
+  resetBtn();
+  closePopup();
+}
+
+function resetBtn(){
+  const btn=document.getElementById('scan-btn');
+  btn.textContent='▶ ACTIVATE CCTV DETECTION';
+  btn.style.background='';btn.style.borderColor='';btn.style.color='';
+}
+function setRule(id,state,text){
+  const el=document.getElementById(id);
+  const lbl=el.querySelector('.rl').outerHTML;
+  const base={rule1:'Emergency Vehicle Detected?',rule2:'Distance &lt; 500m?',rule3:'Confidence &gt; 85%?',rule4:'Traffic Density Check'}[id];
+  el.className='ri'+(state!=='inactive'?' '+state:'');
+  el.innerHTML=lbl+' '+(state!=='inactive'&&text?text:base);
+}
+function setConf(val){
+  document.getElementById('conf-pct').textContent=val+'%';
+  const bar=document.getElementById('conf-bar');
+  bar.style.width=val+'%';
+  bar.className='cbf'+(val>0&&val<85?' danger':'');
+}
+function updateGuards(conf,emgCount){
+  const ce=document.getElementById('g-conf');
+  document.getElementById('g-conf-val').textContent=conf+'% (min: 85%)';
+  if(conf>=85){ce.className='gr ok';document.getElementById('g-conf-badge').textContent='APPROVED';document.getElementById('g-conf-badge').className='gb';}
+  else if(conf>0){ce.className='gr fail';document.getElementById('g-conf-badge').textContent='REJECTED';document.getElementById('g-conf-badge').className='gb fail';}
+  const me=document.getElementById('g-multi');
+  if(emgCount>1){document.getElementById('g-multi-val').textContent=emgCount+' vehicles';me.className='gr warn';document.getElementById('g-multi-badge').textContent='CAUTION';document.getElementById('g-multi-badge').className='gb warn';}
+  else if(emgCount===1){document.getElementById('g-multi-val').textContent='1 vehicle — OK';me.className='gr ok';document.getElementById('g-multi-badge').textContent='NORMAL';document.getElementById('g-multi-badge').className='gb';}
+}
+
+let overrideActive=false;
+function toggleOverride(){
+  overrideActive=!overrideActive;humanOverride=overrideActive;
+  const btn=document.getElementById('ovrbtn');
+  const st=document.getElementById('ovr-status');
+  if(overrideActive){
+    btn.classList.add('active');st.textContent='Override: ACTIVE — Human Control';st.style.color='var(--warn)';
+    if(isEmergency){isEmergency=false;document.getElementById('ebanner').classList.remove('show');showToast('⚠ HUMAN OVERRIDE: AI cancelled','danger');}
+  } else {
+    btn.classList.remove('active');st.textContent='Override: INACTIVE';st.style.color='';
+  }
+}
+
+function showToast(msg,type){
+  const w=document.getElementById('twrap');
+  const t=document.createElement('div');t.className='toast '+(type||'');t.textContent=msg;
+  w.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(100%)';t.style.transition='all 0.3s';setTimeout(()=>t.remove(),300);},3500);
+}
+
+// ── RENDER LOOP ───────────────────────────────────────────────────
+function loop(ts){
+  const dt=Math.min(ts-lastTime,50);lastTime=ts;
+  if(dragging===null)updateVehicles(dt);
+  updateTL(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+updateUI();
+</script>
+</body>
+</html>

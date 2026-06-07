@@ -1,0 +1,6 @@
+path: C:\SEMESTER4\AI\Smart-Emergency-Traffic-System\Dataset\emergency-vehicles\yolo
+train: train/images
+val:   valid/images
+
+nc: 2
+names: ['emergency_vehicle', 'non_emergency_vehicle']
