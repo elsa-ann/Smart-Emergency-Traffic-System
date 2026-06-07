@@ -8,18 +8,43 @@ import json
 from pathlib import Path
 from PIL import Image
 import random
+import io
+import importlib.util
 
 # ── PAGE CONFIG ─────────────────────────────────────────────────
 st.set_page_config(
     page_title="SECS — Smart Emergency Corridor System",
     page_icon="🚑",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
+# ── VIEW SELECTOR ─────────────────────────────────────────────────
+view = st.sidebar.radio("View", ["Prototype (HTML)", "Simulator", "Streamlit Dashboard", "Webcam AI"], index=0)
 html_path = Path(__file__).with_name('app.html')
-if html_path.exists():
-    components.html(html_path.read_text(encoding='utf-8'), width=1200, height=920, scrolling=True)
+if view == "Prototype (HTML)":
+    if html_path.exists():
+        components.html(html_path.read_text(encoding='utf-8'), width=1200, height=920, scrolling=True)
+    else:
+        st.error(f'File not found: {html_path}')
+    st.stop()
+elif view == "Simulator":
+    try:
+        import runpy
+        runpy.run_path(str(Path(__file__).with_name('app_sim.py')))
+    except Exception as e:
+        st.error(f'Failed to launch simulator: {e}')
+    st.stop()
+elif view == "Webcam AI":
+    st.title("Webcam AI — Emergency Vehicle Detector")
+    st.markdown("Use your webcam to capture an approaching vehicle and simulate emergency detection.")
+    camera_image = st.camera_input("Point the camera at the vehicle")
+    if camera_image is not None:
+        st.image(camera_image, caption="Captured image", use_column_width=True)
+        st.markdown("---")
+        st.markdown("**Prediction**: This feature is currently in demo mode. Train a webcam classifier and connect it with live inference.")
+    else:
+        st.info("Please enable your webcam and allow access to preview frames.")
     st.stop()
 
 # ── LOAD MODELS ─────────────────────────────────────────────────

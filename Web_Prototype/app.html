@@ -192,6 +192,10 @@ input[type=range]{width:100%;accent-color:var(--accent);height:4px;cursor:pointe
       <div class="vc">🚑<span id="cnt-amb">0</span></div>
       <div class="vc">🚒<span id="cnt-fire">0</span></div>
     </div>
+    <div style="margin-top:8px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text2)">
+      <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="chk-sim-false"> Simulate false-positive detection</label>
+      <div style="font-size:9px;color:var(--text2);margin-top:4px">Aktifkan untuk menguji deteksi palsu pada kendaraan non-emergency.</div>
+    </div>
     <div style="margin-top:6px"><div class="dbadge dl" id="dbadge">DENSITY: —</div></div>
     <div style="margin-top:6px;font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text2)">
       💡 Klik ikon 📷 untuk lihat data CCTV
@@ -200,7 +204,7 @@ input[type=range]{width:100%;accent-color:var(--accent);height:4px;cursor:pointe
 
   <!-- CENTER -->
   <div class="center">
-    <div class="ptitle" style="align-self:flex-start;width:100%;margin-bottom:8px">INTERSECTION SIMULATION — 1000m VIEW</div>
+    <div class="ptitle" style="align-self:flex-start;width:100%;margin-bottom:8px">INTERSECTION SIMULATION — 700m PER DIRECTION</div>
     <canvas id="sim-canvas"></canvas>
     <div class="cinfo">Pilih kendaraan → klik jalan untuk tambah · Klik kanan hapus · Drag pindah · Klik 📷 untuk data CCTV</div>
     <button class="scan-btn" id="scan-btn" onclick="startScan()">▶ ACTIVATE CCTV DETECTION</button>
@@ -233,7 +237,7 @@ input[type=range]{width:100%;accent-color:var(--accent);height:4px;cursor:pointe
     <div class="rpanel">
       <div class="ptitle">AI REASONING ENGINE</div>
       <div class="ri" id="rule1"><div class="rl">RULE 01</div>Emergency Vehicle Detected?</div>
-      <div class="ri" id="rule2"><div class="rl">RULE 02</div>Distance &lt; 500m?</div>
+      <div class="ri" id="rule2"><div class="rl">RULE 02</div>Distance &lt; 700m?</div>
       <div class="ri" id="rule3"><div class="rl">RULE 03</div>Confidence &gt; 85%?</div>
       <div class="ri" id="rule4"><div class="rl">RULE 04</div>Traffic Density Check</div>
       <div class="rres" id="rule-res">AWAITING SCAN...</div>
@@ -260,6 +264,10 @@ input[type=range]{width:100%;accent-color:var(--accent);height:4px;cursor:pointe
         <div><div class="grn">MULTI-EMERGENCY CHECK</div><div class="grv" id="g-multi-val">—</div></div>
         <div class="gb" id="g-multi-badge">PENDING</div>
       </div>
+      <div class="gr" id="g-duration">
+        <div><div class="grn">PREDICTED PRIORITY DURATION</div><div class="grv" id="g-duration-val">—</div></div>
+        <div class="gb" id="g-duration-badge">PENDING</div>
+      </div>
       <div class="gr ok">
         <div><div class="grn">MAX GREEN DURATION</div><div class="grv">45 sec limit</div></div>
         <div class="gb">ENFORCED</div>
@@ -276,42 +284,61 @@ input[type=range]{width:100%;accent-color:var(--accent);height:4px;cursor:pointe
 const canvas = document.getElementById('sim-canvas');
 const ctx = canvas.getContext('2d');
 
-// Scale canvas to fit center panel
+let W = 520, H = 700, CX = W/2, CY = H/2;
+const ROAD_W = 80;
+let PX_PER_M = H / 1000;
+let CCTV_DIST_PX = Math.round(700 * PX_PER_M);
+let CCTV_CAMS = [];
+let DIST_MARKERS = [];
+
+function updateLayout() {
+  CX = W/2; CY = H/2;
+  PX_PER_M = H / 1400; // 1400m total height/width = 700m per direction
+  const boundary = Math.round(700 * PX_PER_M);
+  const cameraDist = Math.round(500 * PX_PER_M);
+  CCTV_DIST_PX = cameraDist;
+
+  CCTV_CAMS = [
+    {id:'CAM-N', x: CX - ROAD_W/2 - 20, y: CY - cameraDist, dir:'ns', label:'CCTV'},
+    {id:'CAM-S', x: CX + ROAD_W/2 + 4,  y: CY + cameraDist - 14, dir:'ns', label:'CCTV'},
+    {id:'CAM-W', x: CX - cameraDist,  y: CY - ROAD_W/2 - 20, dir:'ew', label:'CCTV'},
+    {id:'CAM-E', x: CX + cameraDist - 14, y: CY - ROAD_W/2 - 20, dir:'ew', label:'CCTV'},
+  ];
+
+  DIST_MARKERS = [
+    {y: CY - boundary, label:'700m — ROAD END'},
+    {y: CY - cameraDist, label:'500m — CCTV'},
+    {y: CY - Math.round(300*PX_PER_M), label:'300m'},
+    {y: CY - Math.round(100*PX_PER_M), label:'100m'},
+    {y: CY + Math.round(100*PX_PER_M), label:'100m'},
+    {y: CY + Math.round(300*PX_PER_M), label:'300m'},
+    {y: CY + cameraDist, label:'500m — CCTV'},
+    {y: CY + boundary, label:'700m — ROAD END'},
+  ];
+}
+
 function resizeCanvas() {
   const center = canvas.parentElement;
   const availH = center.clientHeight - 90;
   const availW = center.clientWidth - 24;
-  // Keep aspect ratio 520:700
-  const ratio = 520/700;
-  let h = availH, w = h * ratio;
+  const ratio = 1;
+  let h = Math.min(availH, availW), w = h * ratio;
   if(w > availW) { w = availW; h = w / ratio; }
   canvas.style.width = w + 'px';
   canvas.style.height = h + 'px';
-  canvas.width = 520;
+  canvas.width = 700;
   canvas.height = 700;
+  W = canvas.width;
+  H = canvas.height;
+  updateLayout();
 }
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
 
-const W = canvas.width, H = canvas.height;
-// Intersection is at CENTER of canvas
-const CX = W/2, CY = H/2;
-const ROAD_W = 80;
-
-// Scale: canvas H=700 represents 1000 meters
-// Intersection at center (350px) = 500m from top
-const PX_PER_M = H / 1000; // 0.7px per meter
-
-// CCTV detection zone: 500m from intersection
-// Top CCTV: at y = CY - 500*PX_PER_M = CY - 350 = 0  → top edge
-// Bottom CCTV: at y = CY + 350 = H → bottom edge
-// We'll place visible CCTV markers at ±350px from center
-const CCTV_DIST_PX = Math.round(500 * PX_PER_M); // 350px
-
 // ── STATE ───────────────────────────────────────────────────────
 let vehicles = [], selectedType = 'car';
 let dragging = null, dragOffX = 0, dragOffY = 0;
-let isEmergency = false, emergencyV = null, humanOverride = false, scanning = false;
+let isEmergency = false, emergencyV = null, warningPhase = false, warningLeft = 0, restorePhase = false, restoreLeft = 0, humanOverride = false, scanning = false;
 let tlState = 0, tlTimer = 0, lastTime = 0;
 let scanTOs = [];
 let speedMult = 0.4; // actual speed multiplier (slider 1-10 → 0.2–2.0)
@@ -322,32 +349,13 @@ const IS_EMG = {car:false,bus:false,truck:false,ambulance:true,firetruck:true};
 // Base speeds in px/frame at 60fps
 const BASE_SPD = {car:0.9,bus:0.6,truck:0.5,ambulance:1.4,firetruck:1.3};
 
-// ── CCTV CAMERA POSITIONS (clickable) ───────────────────────────
-// 4 cameras: one per road approach, ~500m from intersection
-const CCTV_CAMS = [
-  {id:'CAM-N', x: CX - ROAD_W/2 - 20, y: CY - CCTV_DIST_PX, dir:'ns', label:'CAM-N'},
-  {id:'CAM-S', x: CX + ROAD_W/2 + 4,  y: CY + CCTV_DIST_PX - 14, dir:'ns', label:'CAM-S'},
-  {id:'CAM-W', x: CX - CCTV_DIST_PX,  y: CY - ROAD_W/2 - 20, dir:'ew', label:'CAM-W'},
-  {id:'CAM-E', x: CX + CCTV_DIST_PX - 14, y: CY - ROAD_W/2 - 20, dir:'ew', label:'CAM-E'},
-];
-
-// ── DISTANCE MARKERS ────────────────────────────────────────────
-const DIST_MARKERS = [
-  {y: CY - CCTV_DIST_PX, label:'500m — CCTV DETECTION ZONE'},
-  {y: CY - Math.round(300*PX_PER_M), label:'300m'},
-  {y: CY - Math.round(100*PX_PER_M), label:'100m'},
-  {y: CY + Math.round(100*PX_PER_M), label:'100m'},
-  {y: CY + Math.round(300*PX_PER_M), label:'300m'},
-  {y: CY + CCTV_DIST_PX, label:'500m — CCTV DETECTION ZONE'},
-];
-
 // ── SPAWN ────────────────────────────────────────────────────────
 function getSpawnPos(dir) {
   const lo = Math.random()>0.5 ? -1 : 1;
   const lx = CX + lo*(ROAD_W/4);
   const ly = CY + lo*(ROAD_W/4);
-  // Spawn beyond 600m (at edge ~420px from center)
-  const spawnDist = Math.round((650 + Math.random()*200) * PX_PER_M);
+  // Spawn beyond ~900m so vehicles travel through the extended CCTV zone (~700m)
+  const spawnDist = Math.round((900 + Math.random()*200) * PX_PER_M);
   switch(dir) {
     case 'S': return {x:lx, y:CY - spawnDist, dir:'S'};
     case 'N': return {x:lx, y:CY + spawnDist, dir:'N'};
@@ -427,12 +435,13 @@ function updateUI() {
 
 // ── UPDATE VEHICLES ──────────────────────────────────────────────
 function updateVehicles(dt) {
+  if(!scanning && !isEmergency) return;
   const toRm=[];
   vehicles.forEach((v,i)=>{
     const spd = BASE_SPD[v.type] * speedMult * (dt/16);
     const stop = stopPos(v.dir);
     const emg = IS_EMG[v.type];
-    const pass = canPass(v.dir) || (emg&&isEmergency&&!humanOverride);
+    const pass = canPass(v.dir) || (emg && isEmergency && !humanOverride);
 
     if(v.state==='moving') {
       switch(v.dir) {
@@ -537,12 +546,12 @@ function draw() {
 
   // CCTV cameras (clickable)
   CCTV_CAMS.forEach(cam=>{
-    ctx.font='14px serif';
+    ctx.font='18px serif';
     ctx.textAlign='left';ctx.textBaseline='top';
     ctx.fillText('📷',cam.x,cam.y);
-    ctx.font='6px Share Tech Mono,monospace';
-    ctx.fillStyle='rgba(255,184,0,0.6)';
-    ctx.fillText(cam.label,cam.x,cam.y+15);
+    ctx.font='7px Share Tech Mono,monospace';
+    ctx.fillStyle='rgba(255,184,0,0.8)';
+    ctx.fillText(cam.label,cam.x+18,cam.y+3);
 
     // Detection range circle (faint)
     if(isEmergency&&!humanOverride) {
@@ -568,7 +577,19 @@ function draw() {
   });
 
   // Emergency center text
-  if(isEmergency&&!humanOverride){
+  if(warningPhase){
+    const alpha=0.7+0.3*Math.sin(Date.now()/280);
+    ctx.font='bold 10px Orbitron,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=`rgba(255,210,0,${alpha})`;
+    ctx.fillText('⚠ AMBULANCE APPROACHING',CX,CY-12);
+    ctx.fillText('YELLOW WARNING: '+warningLeft+'s',CX,CY+8);
+  } else if(restorePhase){
+    const alpha=0.7+0.3*Math.sin(Date.now()/280);
+    ctx.font='bold 10px Orbitron,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=`rgba(255,210,0,${alpha})`;
+    ctx.fillText('⚠ RESTORING TRAFFIC',CX,CY-12);
+    ctx.fillText('YELLOW TRANSITION: '+restoreLeft+'s',CX,CY+8);
+  } else if(isEmergency&&!humanOverride){
     const alpha=0.5+0.5*Math.sin(Date.now()/380);
     ctx.font='bold 9px Orbitron,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillStyle=`rgba(255,80,0,${alpha})`;
@@ -578,30 +599,46 @@ function draw() {
 }
 
 function drawTLs(){
-  let nsG,ewG;
-  if(isEmergency&&!humanOverride&&emergencyV){
-    nsG=isNS(emergencyV.dir);ewG=!nsG;
+  let nsState='red', ewState='red';
+  if(warningPhase && emergencyV){
+    const priority = isNS(emergencyV.dir);
+    if(priority){ nsState='green'; ewState='yellow'; }
+    else { nsState='yellow'; ewState='green'; }
+  } else if(restorePhase && emergencyV){
+    nsState='yellow'; ewState='yellow';
+  } else if(isEmergency&&!humanOverride&&emergencyV){
+    const priority = isNS(emergencyV.dir);
+    nsState = priority ? 'green' : 'red';
+    ewState = priority ? 'red' : 'green';
   } else {
-    nsG=tlState===0;ewG=tlState===1;
+    nsState = tlState===0 ? 'green' : 'red';
+    ewState = tlState===1 ? 'green' : 'red';
   }
-  // Place traffic lights at intersection corners facing oncoming traffic
-  drawTL(CX+ROAD_W/2+5, CY-ROAD_W/2-38, nsG, 'S→');
-  drawTL(CX-ROAD_W/2-22, CY+ROAD_W/2+4, nsG, 'N→');
-  drawTL(CX+ROAD_W/2+4, CY+ROAD_W/2+4, ewG, 'W→');
-  drawTL(CX-ROAD_W/2-22, CY-ROAD_W/2-38, ewG, 'E→');
+  drawTL(CX+ROAD_W/2+5, CY-ROAD_W/2-38, nsState, 'S→');
+  drawTL(CX-ROAD_W/2-22, CY+ROAD_W/2+4, nsState, 'N→');
+  drawTL(CX+ROAD_W/2+4, CY+ROAD_W/2+4, ewState, 'W→');
+  drawTL(CX-ROAD_W/2-22, CY-ROAD_W/2-38, ewState, 'E→');
 }
 
-function drawTL(x,y,green,label){
+function drawTL(x,y,state,label){
   ctx.fillStyle='#08141e';ctx.strokeStyle='rgba(0,200,255,0.3)';ctx.lineWidth=1;
   ctx.beginPath();ctx.roundRect(x,y,16,38,3);ctx.fill();ctx.stroke();
   ctx.beginPath();ctx.arc(x+8,y+19,3,0,Math.PI*2);ctx.fillStyle='#0d1c2a';ctx.fill();
   ctx.beginPath();ctx.arc(x+8,y+8,4.5,0,Math.PI*2);
-  if(!green){ctx.fillStyle='#ff3b3b';ctx.shadowColor='#ff3b3b';ctx.shadowBlur=10;}
-  else{ctx.fillStyle='#1a0000';ctx.shadowBlur=0;}
+  if(state === 'red'){
+    ctx.fillStyle='#ff3b3b';ctx.shadowColor='#ff3b3b';ctx.shadowBlur=10;
+  } else {
+    ctx.fillStyle='#1a0000';ctx.shadowBlur=0;
+  }
   ctx.fill();ctx.shadowBlur=0;
   ctx.beginPath();ctx.arc(x+8,y+30,4.5,0,Math.PI*2);
-  if(green){ctx.fillStyle='#00ff7f';ctx.shadowColor='#00ff7f';ctx.shadowBlur=10;}
-  else{ctx.fillStyle='#001a00';ctx.shadowBlur=0;}
+  if(state === 'green'){
+    ctx.fillStyle='#00ff7f';ctx.shadowColor='#00ff7f';ctx.shadowBlur=10;
+  } else if(state === 'yellow'){
+    ctx.fillStyle='#ffea00';ctx.shadowColor='#ffea00';ctx.shadowBlur=10;
+  } else {
+    ctx.fillStyle='#001a00';ctx.shadowBlur=0;
+  }
   ctx.fill();ctx.shadowBlur=0;
   ctx.font='6px Share Tech Mono,monospace';ctx.fillStyle='rgba(0,200,255,0.45)';
   ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(label,x+8,y+39);
@@ -666,7 +703,7 @@ function showCCTVPopup(cam, mx, my){
 
   let decision = '—';
   if(closest){
-    if(conf>=85 && distM<=500) decision='OPEN_CORRIDOR';
+    if(conf>=85 && distM<=700) decision='OPEN_CORRIDOR';
     else if(closest && conf<85) decision='CAUTION — LOW CONF';
     else decision='MONITORING';
   } else {
@@ -723,7 +760,7 @@ canvas.addEventListener('click',e=>{
 
 // ── TRAFFIC LIGHT CYCLE ──────────────────────────────────────────
 function updateTL(dt){
-  if(isEmergency)return;
+  if(isEmergency||warningPhase||restorePhase)return;
   tlTimer+=dt;
   if(tlTimer>5000){tlState=1-tlState;tlTimer=0;}
 }
@@ -741,6 +778,7 @@ function clearTOs(){scanTOs.forEach(t=>clearTimeout(t));scanTOs=[];}
 function startScan(){
   if(scanning){resetScan();return;}
   scanning=true;
+  vehicles.forEach(v=>{ if(v.state==='stopped') v.state='moving'; });
   const btn=document.getElementById('scan-btn');
   btn.textContent='⏹ STOP DETECTION';
   btn.style.background='linear-gradient(135deg,#4d0000,#8b0000)';
@@ -756,7 +794,15 @@ function startScan(){
   document.getElementById('cctv-main').textContent='SCANNING...';
   document.getElementById('cctv-sub').textContent='AI PROCESSING';
 
-  if(emgVs.length===0){
+  // allow simulated false-positive detections if checkbox enabled
+  const simFalse = document.getElementById('chk-sim-false') && document.getElementById('chk-sim-false').checked;
+  const nonEmg = vehicles.filter(v=>!IS_EMG[v.type]);
+  let emergencyCandidate = emgVs.length>0 ? emgVs[0] : null;
+  if(!emergencyCandidate && simFalse && nonEmg.length>0 && Math.random()<0.12){
+    emergencyCandidate = nonEmg[0]; // simulate false detection
+  }
+
+  if(!emergencyCandidate){
     const t=setTimeout(()=>{
       document.getElementById('cctv-main').textContent='NO EMERGENCY';
       document.getElementById('cctv-sub').textContent='NORMAL TRAFFIC';
@@ -775,11 +821,12 @@ function startScan(){
     },1200);scanTOs.push(t);return;
   }
 
-  emergencyV=emgVs[0];
-  const conf=88+Math.floor(Math.random()*10);
-  const distPx = isNS(emergencyV.dir) ? Math.abs(emergencyV.y-CY) : Math.abs(emergencyV.x-CX);
-  const distM = Math.round(distPx/PX_PER_M);
-  const multi=emgVs.length>1;
+  emergencyV = emergencyCandidate;
+  const simulatedFalse = emergencyV && !IS_EMG[emergencyV.type];
+  const conf = emergencyV ? (simulatedFalse ? 70+Math.floor(Math.random()*10) : 88+Math.floor(Math.random()*10)) : 0;
+  const distPx = emergencyV ? (isNS(emergencyV.dir) ? Math.abs(emergencyV.y-CY) : Math.abs(emergencyV.x-CX)) : 0;
+  const distM = emergencyV ? Math.round(distPx/PX_PER_M) : 0;
+  const multi = emgVs.length>1;
 
   const t1=setTimeout(()=>{
     document.getElementById('cctv-main').textContent=EMOJI[emergencyV.type]+' DETECTED';
@@ -791,11 +838,11 @@ function startScan(){
     setConf(conf);
     setRule('rule1','active',EMOJI[emergencyV.type]+' '+emergencyV.type.toUpperCase()+' FOUND');
   },700);
-  const t2=setTimeout(()=>setRule('rule2',distM<=500?'active':'fail','Distance: '+distM+'m '+(distM<=500?'✓':'— TOO FAR')),1300);
+  const t2=setTimeout(()=>setRule('rule2',distM<=700?'active':'fail','Distance: '+distM+'m '+(distM<=700?'✓':'— TOO FAR')),1300);
   const t3=setTimeout(()=>setRule('rule3',conf>=85?'active':'fail','Confidence: '+conf+'% '+(conf>=85?'✓':'— BELOW THRESHOLD')),1900);
   const t4=setTimeout(()=>setRule('rule4','active','Traffic: '+densLabel),2400);
   const t5=setTimeout(()=>{
-    if(conf<85||distM>500){
+    if(conf<85||distM>700){
       document.getElementById('rule-res').className='rres fail';
       document.getElementById('rule-res').textContent=conf<85?'✕ REJECTED — LOW CONFIDENCE':'✕ REJECTED — VEHICLE TOO FAR';
       updateGuards(conf,emgVs.length);
@@ -811,26 +858,105 @@ function startScan(){
 }
 
 function activatePlanning(multi){
-  ['plan1','plan2','plan3','plan4','plan5'].forEach((id,i)=>{
-    const t=setTimeout(()=>{
-      document.getElementById(id).classList.add('active');
-      if(i<=2){
-        isEmergency=true;
-        document.getElementById('ebanner').classList.add('show');
-        document.getElementById('ehdr').style.display='flex';
-      }
-    },i*700);scanTOs.push(t);
-  });
-  const tEnd=setTimeout(()=>{
+  warningPhase = true;
+  warningLeft = 4;
+  document.getElementById('rule-res').className='rres warn';
+  document.getElementById('rule-res').textContent='⚠ PREPARING TRAFFIC WARNING';
+  showToast('⚠ Emergency approaching 500m — prepare to stop traffic','danger');
+
+  const tWarn1=setTimeout(()=>{warningLeft=3;},1000);
+  const tWarn2=setTimeout(()=>{warningLeft=2;},2000);
+  const tWarn3=setTimeout(()=>{warningLeft=1;},3000);
+  const tWarnEnd=setTimeout(()=>{
+    warningPhase=false;
+    isEmergency=true;
+    ['plan1','plan2','plan3','plan4','plan5'].forEach((id,i)=>{
+      const t=setTimeout(()=>{
+        document.getElementById(id).classList.add('active');
+        if(i<=2){
+          document.getElementById('ebanner').classList.add('show');
+          document.getElementById('ehdr').style.display='flex';
+        }
+      },i*700);scanTOs.push(t);
+    });
     showToast('🚑 CORRIDOR OPEN — '+emergencyV.type.toUpperCase()+' priority active','danger');
     if(multi)showToast('⚠ Multiple emergency — prioritizing nearest','danger');
-    scanning=false;
-  },5*700+300);
-  scanTOs.push(tEnd);
+    try{
+      const distPx = isNS(emergencyV.dir) ? Math.abs(emergencyV.y-CY) : Math.abs(emergencyV.x-CX);
+      const speed_px_per_frame = BASE_SPD[emergencyV.type] * speedMult; // px per frame
+      const speed_px_per_sec = speed_px_per_frame * 60; // approx
+      const eta_s = Math.max(0, Math.round(distPx / speed_px_per_sec));
+      const greenDuration = Math.min(45, Math.max(5, Math.ceil(eta_s + 5))); // buffer 5s, cap 45s
+      document.getElementById('g-duration-val').textContent = greenDuration + 's';
+      document.getElementById('g-duration-badge').textContent = 'PREDICTED';
+      document.getElementById('g-duration-badge').className = 'gb';
+      showToast('⏱ Predicted priority duration: '+greenDuration+'s','success');
+
+      const tMonitor = setTimeout(function monitorEmergencyClear(){
+        if(!isEmergency || humanOverride) return;
+        const emgVehicles = vehicles.filter(v=>IS_EMG[v.type]);
+        if(emgVehicles.length===0){
+          beginRestore();
+          return;
+        }
+        const tNext = setTimeout(monitorEmergencyClear, 800);
+        scanTOs.push(tNext);
+      }, 800);
+      scanTOs.push(tMonitor);
+    }catch(e){console.warn(e)}
+  }, 4000);
+  scanTOs.push(tWarn1,tWarn2,tWarn3,tWarnEnd);
+}
+
+function beginRestore(){
+  if(restorePhase||!isEmergency||!emergencyV) return;
+  restorePhase = true;
+  restoreLeft = 4;
+  document.getElementById('rule-res').className='rres warn';
+  document.getElementById('rule-res').textContent='⚠ RESTORING NORMAL TRAFFIC';
+  showToast('⚠ Preparing traffic for normal flow','success');
+
+  const tR1 = setTimeout(()=>{restoreLeft=3;},1000);
+  const tR2 = setTimeout(()=>{restoreLeft=2;},2000);
+  const tR3 = setTimeout(()=>{restoreLeft=1;},3000);
+  const tRend = setTimeout(()=>{
+    restorePhase = false;
+    const priority = isNS(emergencyV.dir);
+    isEmergency = false;
+    emergencyV = null;
+    tlState = priority ? 1 : 0;
+    document.getElementById('rule-res').className='rres';
+    document.getElementById('rule-res').textContent='TRAFFIC NORMALIZED';
+    updateGuards(0,0);
+    ['plan1','plan2','plan3','plan4','plan5'].forEach(id=>document.getElementById(id).classList.remove('active'));
+    document.getElementById('ebanner').classList.remove('show');
+    document.getElementById('ehdr').style.display='none';
+    showToast('✅ Traffic restored to normal cycle','success');
+  }, 4000);
+  scanTOs.push(tR1,tR2,tR3,tRend);
+}
+
+function normalizeTraffic(){
+  clearTOs();
+  warningPhase=false;
+  restorePhase=false;
+  warningLeft=0;
+  restoreLeft=0;
+  isEmergency=false;
+  emergencyV=null;
+  document.getElementById('ebanner').classList.remove('show');
+  document.getElementById('ehdr').style.display='none';
+  document.getElementById('cctv-main').textContent='SCANNING...';
+  document.getElementById('cctv-main').style.color='';
+  document.getElementById('cctv-sub').textContent='NORMAL TRAFFIC';
+  document.getElementById('rule-res').className='rres';
+  document.getElementById('rule-res').textContent='AWAITING EMERGENCY';
+  ['plan1','plan2','plan3','plan4','plan5'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  updateGuards(0,0);
 }
 
 function resetScan(){
-  clearTOs();scanning=false;isEmergency=false;emergencyV=null;
+  clearTOs();scanning=false;isEmergency=false;emergencyV=null;restorePhase=false;restoreLeft=0;warningPhase=false;warningLeft=0;
   document.getElementById('ebanner').classList.remove('show');
   document.getElementById('ehdr').style.display='none';
   document.getElementById('cctv-main').textContent='SCANNING...';
@@ -844,10 +970,12 @@ function resetScan(){
   document.getElementById('rule-res').className='rres';
   document.getElementById('rule-res').textContent='AWAITING SCAN...';
   ['plan1','plan2','plan3','plan4','plan5'].forEach(id=>document.getElementById(id).classList.remove('active'));
-  ['g-conf','g-multi'].forEach(id=>document.getElementById(id).className='gr');
+  ['g-conf','g-multi','g-duration'].forEach(id=>document.getElementById(id).className='gr');
   document.getElementById('g-conf-val').textContent='—';document.getElementById('g-multi-val').textContent='—';
+  document.getElementById('g-duration-val').textContent='—';
   document.getElementById('g-conf-badge').textContent='PENDING';document.getElementById('g-conf-badge').className='gb';
   document.getElementById('g-multi-badge').textContent='PENDING';document.getElementById('g-multi-badge').className='gb';
+  document.getElementById('g-duration-badge').textContent='PENDING';document.getElementById('g-duration-badge').className='gb';
   resetBtn();
   closePopup();
 }
@@ -860,7 +988,7 @@ function resetBtn(){
 function setRule(id,state,text){
   const el=document.getElementById(id);
   const lbl=el.querySelector('.rl').outerHTML;
-  const base={rule1:'Emergency Vehicle Detected?',rule2:'Distance &lt; 500m?',rule3:'Confidence &gt; 85%?',rule4:'Traffic Density Check'}[id];
+  const base={rule1:'Emergency Vehicle Detected?',rule2:'Distance &lt; 700m?',rule3:'Confidence &gt; 85%?',rule4:'Traffic Density Check'}[id];
   el.className='ri'+(state!=='inactive'?' '+state:'');
   el.innerHTML=lbl+' '+(state!=='inactive'&&text?text:base);
 }
