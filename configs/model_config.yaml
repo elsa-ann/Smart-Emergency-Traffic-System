@@ -1,0 +1,19 @@
+# Model Parameters
+yolo:
+  model: yolo11n.pt
+  input_size: 640
+  confidence_threshold: 0.85
+  iou_threshold: 0.45
+  max_detections: 10
+
+decision:
+  model: decision_model.pkl
+  encoders: label_encoders.pkl
+  min_confidence: 85.0
+  max_distance: 500
+  classes: [OPEN_CORRIDOR, CAUTION, NO_ACTION]
+
+webcam_classifier:
+  model: webcam_classifier.pkl
+  input_size: 224
+  classes: [ambulance, emergency_vehicle, regular_vehicle]

@@ -1,0 +1,24 @@
+# Safety & Ethical Constraints
+guardrails:
+  min_confidence: 85
+  max_distance_m: 500
+  max_green_time_s: 45
+  min_frames_for_decision: 1
+  require_human_confirmation: false
+
+emergency_vehicles:
+  types: [ambulance, firetruck]
+  priority: high
+
+non_emergency_vehicles:
+  types: [car, bus, truck, motorcycle]
+  priority: normal
+
+false_positive_risk:
+  max_false_positive_rate: 0.05
+  action: LOG_AND_ESCALATE
+
+audit:
+  enable_logging: true
+  log_file: logs/decisions.csv
+  fields: [timestamp, model_version, vehicle_type, distance_m, confidence_pct, decision, operator_override]
