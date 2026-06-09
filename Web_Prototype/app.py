@@ -63,7 +63,7 @@ elif view == "Webcam AI":
         try:
             # Cetak path untuk debugging (hapus nanti)
             path_model = PROJECT_ROOT / "Trained_Model" / "webcam_classifier.pkl"
-            st.write(f"Debug: looking for {path_model}")  # sementara
+            # st.write(f"Debug: looking for {path_model}")  # sementara
             clf = joblib.load(path_model)
             with open(PROJECT_ROOT / "Trained_Model" / "webcam_classes.json", "r") as f:
                 classes = json.load(f)["classes"]

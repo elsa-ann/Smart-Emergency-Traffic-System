@@ -355,7 +355,7 @@ function getSpawnPos(dir) {
   const lx = CX + lo*(ROAD_W/4);
   const ly = CY + lo*(ROAD_W/4);
   // Spawn beyond ~900m so vehicles travel through the extended CCTV zone (~700m)
-  const spawnDist = Math.round((900 + Math.random()*200) * PX_PER_M);
+  const spawnDist = Math.round((400 + Math.random()*200) * PX_PER_M);
   switch(dir) {
     case 'S': return {x:lx, y:CY - spawnDist, dir:'S'};
     case 'N': return {x:lx, y:CY + spawnDist, dir:'N'};
@@ -435,7 +435,10 @@ function updateUI() {
 
 // ── UPDATE VEHICLES ──────────────────────────────────────────────
 function updateVehicles(dt) {
-  if(!scanning && !isEmergency) return;
+  if(!scanning && !isEmergency) {
+    // tetap render kendaraan tapi diam
+    return;
+  }
   const toRm=[];
   vehicles.forEach((v,i)=>{
     const spd = BASE_SPD[v.type] * speedMult * (dt/16);
@@ -540,7 +543,21 @@ function draw() {
       ctx.fillStyle=g;ctx.fillRect(0,CY-ROAD_W/2,W,ROAD_W);
     }
   }
-
+  // Helper untuk menggambar rounded rectangle
+CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+  if (w < 2 * r) r = w / 2;
+  if (h < 2 * r) r = h / 2;
+  this.moveTo(x+r, y);
+  this.lineTo(x+w-r, y);
+  this.quadraticCurveTo(x+w, y, x+w, y+r);
+  this.lineTo(x+w, y+h-r);
+  this.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  this.lineTo(x+r, y+h);
+  this.quadraticCurveTo(x, y+h, x, y+h-r);
+  this.lineTo(x, y+r);
+  this.quadraticCurveTo(x, y, x+r, y);
+  return this;
+};
   // Traffic lights
   drawTLs();
 
