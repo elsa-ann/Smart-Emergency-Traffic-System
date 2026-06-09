@@ -11,9 +11,19 @@ import random
 import io
 import importlib.util
 
+# Cari folder root proyek (yang berisi Trained_Model/)
+def find_project_root(start_path):
+    current = Path(start_path).resolve()
+    for parent in [current] + list(current.parents):
+        if (parent / "Trained_Model").exists():
+            return parent
+    return current  # fallback
+
+PROJECT_ROOT = find_project_root(__file__)
+
 # ── PAGE CONFIG ─────────────────────────────────────────────────
 st.set_page_config(
-    page_title="SECS — Smart Emergency Corridor System",
+    page_title="SETS — Smart Emergency Traffic System",
     page_icon="🚑",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -36,15 +46,149 @@ elif view == "Simulator":
         st.error(f'Failed to launch simulator: {e}')
     st.stop()
 elif view == "Webcam AI":
-    st.title("Webcam AI — Emergency Vehicle Detector")
-    st.markdown("Use your webcam to capture an approaching vehicle and simulate emergency detection.")
-    camera_image = st.camera_input("Point the camera at the vehicle")
-    if camera_image is not None:
-        st.image(camera_image, caption="Captured image", use_column_width=True)
-        st.markdown("---")
-        st.markdown("**Prediction**: This feature is currently in demo mode. Train a webcam classifier and connect it with live inference.")
+    st.markdown("""
+    <div style="background:#080f18;border:1px solid #0e3a5c;border-radius:8px;
+    padding:16px 24px;margin-bottom:16px;text-align:center">
+        <div style="font-family:Orbitron,monospace;font-size:20px;font-weight:900;
+        color:#00c8ff;letter-spacing:3px">📷 WEBCAM AI — EMERGENCY CLASSIFIER</div>
+        <div style="font-family:Share Tech Mono,monospace;font-size:10px;
+        color:#5a9abf;letter-spacing:2px;margin-top:6px">
+        POWERED BY RANDOM FOREST · DATASET BARU · REAL-TIME DETECTION</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Load model classifier dan label encoder
+    @st.cache_resource
+    def load_classifier():
+        try:
+            # Cetak path untuk debugging (hapus nanti)
+            path_model = PROJECT_ROOT / "Trained_Model" / "webcam_classifier.pkl"
+            st.write(f"Debug: looking for {path_model}")  # sementara
+            clf = joblib.load(path_model)
+            with open(PROJECT_ROOT / "Trained_Model" / "webcam_classes.json", "r") as f:
+                classes = json.load(f)["classes"]
+            return clf, classes, None
+        except Exception as e:
+            return None, None, str(e)
+
+    # Fungsi ekstraksi fitur (sama seperti di notebook)
+    def extract_features(image, size=(128, 128)):
+        image = image.convert('RGB').resize(size)
+        arr = np.array(image)
+        # Histogram RGB
+        hist = []
+        for i in range(3):
+            h = np.histogram(arr[:,:,i], bins=32, range=(0,255))[0].astype(float)
+            hist.extend(h)
+        # Edge stats sederhana
+        gray = np.mean(arr, axis=2).astype(np.uint8)
+        edge_stats = [gray.mean(), gray.std(), gray.max()]
+        return np.concatenate([hist, edge_stats])
+
+    classifier, class_names, cls_err = load_classifier()
+    # Load decision model (masih sama)
+    @st.cache_resource
+    def load_decision():
+        try:
+            rf = joblib.load(PROJECT_ROOT / "Trained_Model" / "decision_model.pkl")
+            enc = joblib.load(PROJECT_ROOT / "Trained_Model" / "label_encoders.pkl")
+            return rf, enc, None
+        except Exception as e:
+            return None, None, str(e)
+
+    rf_model, rf_enc, rf_err = load_decision()
+
+    # Status badges
+    c1, c2 = st.columns(2)
+    with c1:
+        if classifier:
+            st.success("✅ Classifier (Random Forest) loaded")
+        else:
+            st.error(f"❌ Classifier error: {cls_err}")
+    with c2:
+        if rf_model:
+            st.success("✅ Decision Model loaded")
+        else:
+            st.error(f"❌ Decision model error: {rf_err}")
+
+    st.markdown("---")
+
+    # Input mode
+    input_mode = st.radio("Input Mode", ["📷 Live Webcam", "🖼️ Upload Image"], horizontal=True)
+
+    if input_mode == "📷 Live Webcam":
+        img_input = st.camera_input("Arahkan kamera ke kendaraan")
     else:
-        st.info("Please enable your webcam and allow access to preview frames.")
+        uploaded = st.file_uploader("Upload foto kendaraan", type=["jpg","jpeg","png"])
+        img_input = uploaded
+
+    if img_input is not None:
+        from PIL import Image
+        img = Image.open(img_input).convert("RGB")
+        col_img, col_result = st.columns([1, 1])
+        with col_img:
+            st.markdown("**📸 Input Image**")
+            st.image(img, use_container_width=True)
+        with col_result:
+            st.markdown("**🤖 Detection Result**")
+            if classifier:
+                with st.spinner("Memproses gambar..."):
+                    feat = extract_features(img).reshape(1, -1)
+                    pred_label = classifier.predict(feat)[0]          # langsung dapat string
+                    pred_proba = classifier.predict_proba(feat)[0].max()
+                # Tampilkan hasil deteksi
+                is_emergency = (pred_label == "emergency")
+                color = "#ff4500" if is_emergency else "#00ff9d"
+                emoji = "🚑" if is_emergency else "🚗"
+                st.markdown(f"""
+                <div style="background:#0c1620;border:1px solid {color};border-radius:4px;
+                padding:10px;margin-bottom:8px">
+                    <div style="font-family:Orbitron,monospace;font-size:14px;color:{color}">
+                    {emoji} {pred_label.upper()}</div>
+                    <div style="font-family:Share Tech Mono,monospace;font-size:11px;color:#5a9abf;margin-top:4px">
+                    Confidence: <span style="color:{color}">{pred_proba*100:.1f}%</span></div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Panggil decision model jika emergency dan confidence >=85%
+                if is_emergency and pred_proba >= 0.85:
+                    # Gunakan decision model
+                    if rf_model and rf_enc:
+                        # Contoh parameter: jarak 300m, traffic medium, dll (bisa diambil dari sidebar atau default)
+                        # Di sini kita gunakan default sederhana, tapi bisa juga user set di sidebar
+                        X = pd.DataFrame([{
+                            'vehicle_type_enc': rf_enc['vehicle_type'].transform(["ambulance"])[0],
+                            'traffic_density_enc': rf_enc['traffic_density'].transform(["medium"])[0],
+                            'time_of_day_enc': rf_enc['time_of_day'].transform(["afternoon"])[0],
+                            'weather_enc': rf_enc['weather'].transform(["clear"])[0],
+                            'distance_m': 300,
+                            'confidence_pct': pred_proba*100,
+                            'vehicle_count': 5,
+                        }])
+                        pred = rf_model.predict(X)[0]
+                        proba = rf_model.predict_proba(X)[0]
+                        decision = rf_enc['decision'].inverse_transform([pred])[0]
+                        prob_map = {c: round(float(p)*100,1) for c,p in zip(rf_enc['decision'].classes_, proba)}
+                        if decision == "OPEN_CORRIDOR":
+                            st.markdown('<div class="emergency-banner" style="font-size:14px;">⚠ OPEN CORRIDOR ⚠<br>Emergency vehicle detected. Traffic light will turn GREEN.</div>', unsafe_allow_html=True)
+                        elif decision == "CAUTION":
+                            st.markdown('<div class="caution-banner">⚠ CAUTION — Monitoring, confidence not high enough</div>', unsafe_allow_html=True)
+                        else:
+                            st.markdown('<div class="normal-banner">✓ NO ACTION — No corridor needed</div>', unsafe_allow_html=True)
+                        st.markdown("**Decision probabilities:**")
+                        for cls2, p in sorted(prob_map.items(), key=lambda x:-x[1]):
+                            color2 = "#ff6600" if cls2=="OPEN_CORRIDOR" else "#ffb800" if cls2=="CAUTION" else "#00ff9d"
+                            st.markdown(f'<div style="display:flex;justify-content:space-between;font-family:Share Tech Mono,monospace;font-size:10px;color:{color2};margin-bottom:3px"><span>{cls2}</span><span>{p}%</span></div>', unsafe_allow_html=True)
+                    else:
+                        st.warning("Decision model not available.")
+                elif is_emergency:
+                    st.markdown('<div class="caution-banner">⚠ CAUTION — Emergency detected but confidence below 85% (ethical guardrail)</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown('<div class="normal-banner">✓ NO ACTION — Non-emergency vehicle</div>', unsafe_allow_html=True)
+            else:
+                st.error("Classifier model not available.")
+    else:
+        st.info("📷 Aktifkan webcam atau upload foto kendaraan untuk memulai deteksi.")
     st.stop()
 
 # ── LOAD MODELS ─────────────────────────────────────────────────
@@ -52,9 +196,9 @@ elif view == "Webcam AI":
 def load_models():
     models = {}
     try:
-        models['decision'] = joblib.load("Trained_Model/decision_model.pkl")
-        models['encoders'] = joblib.load("Trained_Model/label_encoders.pkl")
-        models['yolo_ready'] = Path("Trained_Model/best.pt").exists()
+        models['decision'] = joblib.load(PROJECT_ROOT / "Trained_Model" / "decision_model.pkl")
+        models['encoders'] = joblib.load(PROJECT_ROOT / "Trained_Model" / "label_encoders.pkl")
+        models['yolo_ready'] = (PROJECT_ROOT / "Trained_Model" / "best.pt").exists()
     except Exception as e:
         st.error(f"Error loading models: {e}")
     return models
@@ -328,7 +472,7 @@ if 'corridors_opened' not in st.session_state:
 # ── HEADER ──────────────────────────────────────────────────────
 st.markdown("""
 <div class="secs-header">
-    <p class="secs-title">🚑 SECS // SMART EMERGENCY CORRIDOR SYSTEM</p>
+    <p class="secs-title">🚑 SETS // SMART EMERGENCY TRAFFIC SYSTEM</p>
     <p class="secs-sub">AI-POWERED TRAFFIC MANAGEMENT · REASONING & PLANNING · ETHICAL GUARDRAILS</p>
 </div>
 """, unsafe_allow_html=True)
@@ -336,7 +480,16 @@ st.markdown("""
 # ── SIDEBAR ──────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown('<div class="card-title">⚙ SIMULATION CONTROL</div>', unsafe_allow_html=True)
-
+    direction = st.selectbox(
+        "DIRECTION",
+        ["north", "south", "east", "west"],
+        format_func=lambda x: {
+            "north": "⬆️ North (dari atas)",
+            "south": "⬇️ South (dari bawah)",
+            "east":  "➡️ East (dari kanan)",
+            "west":  "⬅️ West (dari kiri)"
+        }[x]
+    )
     vehicle_type = st.selectbox(
         "VEHICLE TYPE",
         ["ambulance", "firetruck", "car", "bus", "truck", "motorcycle"],
@@ -429,6 +582,7 @@ if scan_btn:
         "vehicle_count": vehicle_count,
         "time_of_day": time_of_day,
         "weather": weather,
+        "direction": direction,
         "decision": decision,
         "prob": prob,
         "all_probs": all_probs,
@@ -492,12 +646,17 @@ with col_left:
     st.markdown('<div class="card-title" style="margin-top:14px">🚦 TRAFFIC LIGHT STATUS</div>', unsafe_allow_html=True)
 
     if res and res['decision'] == 'OPEN_CORRIDOR' and res['is_emergency']:
-        ns_is_emg = res['vehicle_type'] in ['ambulance','firetruck']
-        # Determine which direction based on random for demo
-        emg_ns = random.random() > 0.5
-        ns_green = emg_ns
-        ew_green = not emg_ns
+        # Tentukan jalur prioritas berdasarkan direction dari scan_result
+        dir_priority = res.get('direction', 'north')
+        # Jika arah utara atau selatan, maka NS hijau, EW merah
+        if dir_priority in ['north', 'south']:
+            ns_green = True
+            ew_green = False
+        else:  # east atau west
+            ns_green = False
+            ew_green = True
     else:
+        # Normal cycle: bergantian (misal default NS hijau)
         ns_green = True
         ew_green = False
 
@@ -507,6 +666,20 @@ with col_left:
     ew_label = "GREEN" if ew_green else "RED"
     ns_color = "#00ff9d" if ns_green else "#ff3b3b"
     ew_color = "#00ff9d" if ew_green else "#ff3b3b"
+
+        # Tentukan teks arah untuk banner
+    if res and res["decision"] == "OPEN_CORRIDOR":
+        dir_text = {
+            "north": "⬆️ UTARA",
+            "south": "⬇️ SELATAN",
+            "east": "➡️ TIMUR",
+            "west": "⬅️ BARAT"
+        }.get(res.get('direction', 'north'), '')
+        banner_html = f'<div class="emergency-banner">⚠ EMERGENCY CORRIDOR ACTIVE ⚠<br>PRIORITY LANE: {dir_text}</div>'
+    elif res:
+        banner_html = '<div class="normal-banner">✓ NORMAL TRAFFIC CYCLE</div>'
+    else:
+        banner_html = '<div style="text-align:center;font-family:Share Tech Mono,monospace;font-size:11px;color:#1a5c8a;padding:10px">AWAITING SCAN...</div>'
 
     st.markdown(f"""
     <div style="display:flex;gap:10px;justify-content:center;margin:8px 0">
@@ -531,9 +704,7 @@ with col_left:
             <div class="tl-state" style="color:{ew_color}">{ew_label}</div>
         </div>
     </div>
-    {'<div class="emergency-banner">⚠ EMERGENCY CORRIDOR ACTIVE ⚠</div>' if (res and res["decision"]=="OPEN_CORRIDOR") else
-     '<div class="normal-banner">✓ NORMAL TRAFFIC CYCLE</div>' if res else
-     '<div style="text-align:center;font-family:Share Tech Mono,monospace;font-size:11px;color:#1a5c8a;padding:10px">AWAITING SCAN...</div>'}
+    {banner_html}
     """, unsafe_allow_html=True)
 
 # ── MIDDLE: AI Reasoning + Planning ─────────────────────────────

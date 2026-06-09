@@ -32,7 +32,7 @@ def load_dataset():
 models = load_models()
 dataset = load_dataset()
 
-st.markdown("# 🚦 Emergency Corridor Simulator")
+st.markdown("# 🚦 Emergency Traffic Simulator")
 st.markdown("Use sample traffic scenarios to test corridor planning decisions and compare AI outputs.")
 
 mode = st.sidebar.radio("Simulation Mode", ["Random Scenario", "Dataset Playback", "Manual Scenario"])
@@ -41,7 +41,7 @@ if mode == "Dataset Playback":
     if dataset.empty:
         st.error("Dataset not found. Make sure Dataset/traffic_decisions.csv exists.")
         st.stop()
-    index = st.sidebar.slider("Choose dataset row", 0, len(dataset) - 1, 0)
+    index = st.sidebar.number_input("Choose dataset row", min_value=0, max_value=len(dataset)-1, value=0, step=1)
     scenario = dataset.iloc[index].to_dict()
 else:
     traffic_options = ["clear", "low", "medium", "high", "jam"]
