@@ -99,17 +99,16 @@ elif view == "Webcam AI":
     rf_model, rf_enc, rf_err = load_decision()
 
     # Status badges
-    c1, c2 = st.columns(2)
-    with c1:
-        if classifier:
-            st.success("✅ Classifier (Random Forest) loaded")
-        else:
-            st.error(f"❌ Classifier error: {cls_err}")
-    with c2:
-        if rf_model:
-            st.success("✅ Decision Model loaded")
-        else:
-            st.error(f"❌ Decision model error: {rf_err}")
+   # c1, c2 = st.columns(2)
+    #with c1:
+     ##      st.success("✅ Classifier (Random Forest) loaded")
+       # else:
+        #    st.error(f"❌ Classifier error: {cls_err}")
+    #with c2:
+     #   if rf_model:
+      #      st.success("✅ Decision Model loaded")
+       # else:
+        #    st.error(f"❌ Decision model error: {rf_err}")
 
     st.markdown("---")
 
