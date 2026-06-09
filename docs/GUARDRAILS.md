@@ -1,4 +1,4 @@
-# Ethical Guardrails for SECS (Smart Emergency Corridor System)
+# Ethical Guardrails for SETS (Smart Emergency Traffic System)
 
 This document lists the safety and ethical constraints enforced by the system.
 
