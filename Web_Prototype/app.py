@@ -182,7 +182,7 @@ elif view == "Webcam AI":
                             conf = float(box.conf[0])
                             class_name = results.names[cls_id]
                             print(f"YOLO detected: {class_name} (conf={conf:.2f})")
-                            if class_name.lower() in ["non_emergency_vehicle" ,"emergency_vehicle", "ambulance", "firetruck", "fire truck"]:
+                            if class_name.lower() in ["emergency_vehicle", "ambulance", "firetruck", "fire truck"]:
                                 yolo_emergency = True
                                 yolo_conf = max(yolo_conf, conf)
                                 yolo_classes_detected.append((class_name, conf))
