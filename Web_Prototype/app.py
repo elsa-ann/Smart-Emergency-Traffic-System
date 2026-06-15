@@ -11,6 +11,13 @@ import random
 import io
 import importlib.util
 
+def load_accuracy_info():
+    json_path = Path(__file__).parent / "hasil_akurasi.json"
+    if json_path.exists():
+        with open(json_path, "r") as f:
+            return json.load(f)
+    return None
+
 # Cari folder root proyek (yang berisi Trained_Model/)
 def find_project_root(start_path):
     current = Path(start_path).resolve()
@@ -46,18 +53,27 @@ elif view == "Simulator":
         st.error(f'Failed to launch simulator: {e}')
     st.stop()
 elif view == "Webcam AI":
-    st.markdown("""
+    acc_info = load_accuracy_info()
+    if acc_info:
+        cnn_acc = acc_info.get("cnn_accuracy", 84.13)
+        yolo_acc = acc_info.get("yolo_accuracy", 88.89)
+        avg_acc = acc_info.get("avg_accuracy", 85.12)
+        info_text = f"ENSEMBLE OR · CNN ({cnn_acc:.1f}%) + YOLO ({yolo_acc:.1f}%) · Rata-rata {avg_acc:.1f}%"
+    else:
+        info_text = "ENSEMBLE OR · CNN + YOLO · REAL-TIME DETECTION"
+
+    st.markdown(f"""
     <div style="background:#080f18;border:1px solid #0e3a5c;border-radius:8px;
     padding:16px 24px;margin-bottom:16px;text-align:center">
         <div style="font-family:Orbitron,monospace;font-size:20px;font-weight:900;
         color:#00c8ff;letter-spacing:3px">📷 WEBCAM AI — EMERGENCY CLASSIFIER</div>
         <div style="font-family:Share Tech Mono,monospace;font-size:10px;
         color:#5a9abf;letter-spacing:2px;margin-top:6px">
-        ENSEMBLE OR · CNN (96.97%) + YOLO GLOBAL (99.4%) · REAL-TIME DETECTION</div>
+        {info_text}</div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Import yang diperlukan
+    # Import tambahan
     import torch
     import torchvision.transforms as transforms
     from PIL import Image
@@ -66,13 +82,12 @@ elif view == "Webcam AI":
     import cv2
     import numpy as np
 
-    # ---------------------- LOAD CNN MODEL ----------------------
+    # ---------------------- LOAD CNN ----------------------
     @st.cache_resource
     def load_cnn_model():
         try:
             model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', weights=None)
-            num_features = model.fc.in_features
-            model.fc = torch.nn.Linear(num_features, 3)
+            model.fc = torch.nn.Linear(model.fc.in_features, 3)
             model_path = PROJECT_ROOT / "Trained_Model" / "best_cnn_model.pth"
             model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
             model.eval()
@@ -87,11 +102,11 @@ elif view == "Webcam AI":
         except Exception as e:
             return None, None, None, str(e)
 
-    # ---------------------- LOAD YOLO GLOBAL ----------------------
+    # ---------------------- LOAD YOLO ----------------------
     @st.cache_resource
     def load_yolo_global():
         try:
-            yolo_path = PROJECT_ROOT / "Trained_Model" / "best.pt"   # <- sesuaikan jika nama file beda
+            yolo_path = PROJECT_ROOT / "Trained_Model" / "best.pt"
             if not yolo_path.exists():
                 return None, "File best.pt tidak ditemukan"
             model = YOLO(yolo_path)
@@ -102,7 +117,7 @@ elif view == "Webcam AI":
     cnn_model, cnn_transform, cnn_classes, cnn_err = load_cnn_model()
     yolo_model, yolo_err = load_yolo_global()
 
-    # Informasi status model di sidebar kecil (opsional)
+    # Tampilkan status model di sidebar
     with st.sidebar:
         st.markdown("---")
         st.markdown('<div class="card-title">🤖 ENSEMBLE STATUS</div>', unsafe_allow_html=True)
@@ -125,9 +140,7 @@ elif view == "Webcam AI":
         img_input = uploaded
 
     if img_input is not None:
-        # Baca gambar dalam PIL RGB (untuk CNN) dan juga numpy BGR (untuk YOLO)
         pil_img = Image.open(img_input).convert("RGB")
-        # Konversi ke numpy array BGR untuk YOLO
         img_np = np.array(pil_img)
         img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
 
@@ -137,88 +150,132 @@ elif view == "Webcam AI":
             st.image(pil_img, use_container_width=True)
 
         with col_result:
-            st.markdown("**🤖 Ensemble (OR) Detection Result**")
-            
+            st.markdown("**🤖 Ensemble Detection Result**")
+
             # --- Prediksi CNN ---
             cnn_emergency = False
             cnn_conf = 0.0
             cnn_label = ""
+            cnn_probs = None
             if cnn_model is not None:
-                with st.spinner("CNN memproses..."):
+                with st.spinner("CNN processing..."):
                     input_tensor = cnn_transform(pil_img).unsqueeze(0)
                     with torch.no_grad():
                         outputs = cnn_model(input_tensor)
                         probs = torch.nn.functional.softmax(outputs[0], dim=0)
+                        cnn_probs = probs.cpu().numpy()
                         pred_idx = torch.argmax(probs).item()
                         cnn_conf = probs[pred_idx].item()
                         cnn_label = cnn_classes[pred_idx]
                         cnn_emergency = (cnn_label in ["ambulance", "pemadam_kebakaran", "pemadam_kebak"])
-            
-            # --- Prediksi YOLO global ---
+
+            # --- Prediksi YOLO ---
             yolo_emergency = False
             yolo_conf = 0.0
             yolo_classes_detected = []
             if yolo_model is not None:
-                with st.spinner("YOLO memproses..."):
-                    results = yolo_model(img_bgr, conf=0.5)[0]
+                with st.spinner("YOLO processing..."):
+                    results = yolo_model(img_bgr, conf=0.25)[0]
                     if results.boxes is not None:
                         for box in results.boxes:
                             cls_id = int(box.cls[0])
                             conf = float(box.conf[0])
                             class_name = results.names[cls_id]
-                            if class_name.lower() in ["ambulance", "firetruck", "fire truck"]:
+                            print(f"YOLO detected: {class_name} (conf={conf:.2f})")
+                            if class_name.lower() in ["non_emergency_vehicle" ,"emergency_vehicle", "ambulance", "firetruck", "fire truck"]:
                                 yolo_emergency = True
                                 yolo_conf = max(yolo_conf, conf)
                                 yolo_classes_detected.append((class_name, conf))
-            
-            # --- Aturan OR ---
-            # Emergency jika salah satu model mendeteksi darurat dengan confidence >=85%
+
+            # --- Aturan Decision (OPEN_CORRIDOR / CAUTION / NO_ACTION) ---
+            # Threshold tetap 85%
             cnn_valid = cnn_emergency and (cnn_conf >= 0.85)
             yolo_valid = yolo_emergency and (yolo_conf >= 0.85)
-            is_emergency = cnn_valid or yolo_valid
-            
-            # Tampilkan hasil prediksi gabungan
-            if is_emergency:
-                st.markdown('<div class="emergency-banner">🚨 KENDARAAN DARURAT TERDETEKSI! 🚨</div>', unsafe_allow_html=True)
-                if cnn_valid:
-                    st.markdown(f'<div class="badge badge-orange">📷 CNN: {cnn_label.upper()} ({cnn_conf*100:.1f}%)</div>', unsafe_allow_html=True)
-                if yolo_valid:
-                    for name, conf in yolo_classes_detected:
-                        st.markdown(f'<div class="badge badge-orange">🎯 YOLO: {name.upper()} ({conf*100:.1f}%)</div>', unsafe_allow_html=True)
-                st.markdown('<div class="emergency-banner">⚠ OPEN CORRIDOR ⚠<br>Emergency lane will turn GREEN.</div>', unsafe_allow_html=True)
+
+            if cnn_valid or yolo_valid:
+                decision = "OPEN_CORRIDOR"
+                decision_color = "#ff4500"
+                decision_icon = "⚠️"
+            elif cnn_emergency or yolo_emergency:
+                decision = "CAUTION"
+                decision_color = "#ffb800"
+                decision_icon = "⚠"
             else:
-                # Jika tidak darurat, tampilkan alasan
-                st.markdown('<div class="normal-banner">✓ Tidak ada kendaraan darurat terdeteksi.</div>', unsafe_allow_html=True)
-                if cnn_emergency and cnn_conf < 0.85:
-                    st.markdown(f'<div class="caution-banner">⚠ CNN: {cnn_label.upper()} terdeteksi tapi confidence {cnn_conf*100:.1f}% < 85% (ethical guardrail)</div>', unsafe_allow_html=True)
-                if yolo_emergency and yolo_conf < 0.85:
-                    st.markdown(f'<div class="caution-banner">⚠ YOLO: kendaraan darurat terdeteksi tapi confidence {yolo_conf*100:.1f}% < 85%</div>', unsafe_allow_html=True)
-                if not cnn_emergency and not yolo_emergency:
-                    st.markdown('<div class="normal-banner">Tidak ada deteksi kendaraan darurat dari kedua model.</div>', unsafe_allow_html=True)
-            
-            # Tampilkan probabilitas CNN (opsional)
-            if cnn_model is not None:
-                st.markdown("**CNN Probabilities:**")
+                decision = "NO_ACTION"
+                decision_color = "#00ff9d"
+                decision_icon = "✓"
+
+            # Tampilkan Decision besar
+            st.markdown(f"""
+            <div style="background:#0c1620;border:1px solid {decision_color};border-radius:8px;padding:20px;text-align:center;margin-bottom:16px">
+                <div style="font-family:Orbitron,monospace;font-size:28px;font-weight:900;color:{decision_color};letter-spacing:3px">
+                    {decision_icon} {decision} {decision_icon}
+                </div>
+                <div style="font-family:Share Tech Mono,monospace;font-size:12px;color:#5a9abf;margin-top:8px">
+                    Ensemble (OR) · CNN + YOLO
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Tampilkan detail deteksi
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.markdown("**📷 CNN**")
+                if cnn_model:
+                    emoji = "🚑" if "ambulance" in cnn_label else "🔥" if "pemadam" in cnn_label else "🚗"
+                    st.markdown(f"{emoji} **{cnn_label.upper()}** ({cnn_conf*100:.1f}%)")
+                else:
+                    st.markdown("*not loaded*")
+            with col_b:
+                st.markdown("**🎯 YOLO**")
+                if yolo_model and yolo_classes_detected:
+                    for name, conf in yolo_classes_detected:
+                        st.markdown(f"🚒 **{name.upper()}** ({conf*100:.1f}%)")
+                elif yolo_model:
+                    st.markdown("*No emergency detected*")
+                else:
+                    st.markdown("*not loaded*")
+
+            # Tampilkan probabilitas CNN
+            if cnn_probs is not None:
+                st.markdown("**📊 CNN Probabilities**")
                 for i, cls in enumerate(cnn_classes):
-                    prob = probs[i].item()
+                    prob = cnn_probs[i] * 100
                     bar_color = "#ff6600" if cls in ["ambulance","pemadam_kebakaran","pemadam_kebak"] else "#00ff9d"
                     st.markdown(f"""
-                    <div style="margin-bottom:4px">
+                    <div style="margin-bottom:6px">
                         <div style="display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:10px;color:{bar_color}">
-                            <span>{cls}</span><span>{prob*100:.1f}%</span>
+                            <span>{cls}</span><span>{prob:.1f}%</span>
                         </div>
-                        <div class="conf-bar-bg"><div class="conf-bar-fill" style="width:{prob*100}%;background:{bar_color};opacity:0.8"></div></div>
+                        <div class="conf-bar-bg"><div class="conf-bar-fill" style="width:{prob}%;background:{bar_color};opacity:0.8"></div></div>
                     </div>
                     """, unsafe_allow_html=True)
-            
-            # Opsional: tampilkan hasil deteksi YOLO (bounding box)
+
+            # Jika ada deteksi YOLO, tampilkan gambar anotasi
             if yolo_model is not None and results.boxes is not None:
                 annotated = results.plot()
                 annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
                 st.image(annotated_rgb, caption="YOLO Detection (bounding box)", use_container_width=True)
+
     else:
         st.info("📷 Aktifkan webcam atau upload foto kendaraan untuk memulai deteksi.")
     st.stop()
+
+elif view == "Model Evaluation":
+    st.title("📊 Model Performance Evaluation")
+    st.markdown("Upload your test images to evaluate the ensemble model.")
+    
+    uploaded_files = st.file_uploader("Upload multiple images", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
+    if uploaded_files:
+        y_true = []
+        y_pred = []
+        for file in uploaded_files:
+            # Assuming filename contains ground truth label (e.g., 'ambulance_001.jpg')
+            true_label = file.name.split('_')[0]
+            img = Image.open(file).convert('RGB')
+            # ... (call prediction function and store results)
+        # Calculate and display metrics
+        st.write(f"Accuracy: {accuracy_score(y_true, y_pred)*100:.2f}%")
 
 # ── LOAD MODELS ─────────────────────────────────────────────────
 @st.cache_resource
@@ -899,11 +956,28 @@ with col_right:
 # ── MODEL INFO (bottom) ───────────────────────────────────────────
 st.markdown("---")
 col_a, col_b, col_c, col_d = st.columns(4)
+# Ambil data akurasi dari JSON jika ada
+acc_info = load_accuracy_info()
+if acc_info:
+    cnn_acc = acc_info.get("cnn_accuracy", 84.13)
+    yolo_acc = acc_info.get("yolo_accuracy", 88.89)
+    rf_acc = acc_info.get("rf_accuracy", 83.33)
+    ensemble_acc = acc_info.get("ensemble_accuracy", 84.13)
+    avg_acc = acc_info.get("avg_accuracy", 85.12)
+    time_ms = acc_info.get("inference_time_ms", 32.02)
+else:
+    cnn_acc = 84.13
+    yolo_acc = 88.89
+    rf_acc = 83.33
+    ensemble_acc = 84.13
+    avg_acc = 85.12
+    time_ms = 32.02
+
 infos = [
-    ("🤖 YOLO MODEL", "YOLOv11n", "Emergency Detection", "99.4% mAP50"),
-    ("🌲 RANDOM FOREST", "100 Trees", "Decision Making", "95.0% Accuracy"),
-    ("📊 TRAINING DATA", "200 images + 1000 samples", "Emergency Vehicles + Traffic", "Synthetic + Kaggle"),
-    ("⚡ SYSTEM", "Real-time AI", "Sense → Reason → Plan → Act", "Ethical Guardrails Active"),
+    ("🧠 CNN (ResNet18)", f"{cnn_acc:.1f}%", "Emergency Classification", f"{time_ms:.0f}ms inference"),
+    ("🎯 YOLO Global", f"{yolo_acc:.1f}%", "Object Detection", "best.pt"),
+    ("🌲 Random Forest", f"{rf_acc:.1f}%", "Decision Making", f"{acc_info.get('rf_time_ms', 10.61):.0f}ms" if acc_info else "10.6ms"),
+    ("⚡ Ensemble OR", f"{ensemble_acc:.1f}%", f"Rata-rata {avg_acc:.1f}%", "CNN + YOLO"),
 ]
 for col, (title, val, sub, badge) in zip([col_a,col_b,col_c,col_d], infos):
     with col:
