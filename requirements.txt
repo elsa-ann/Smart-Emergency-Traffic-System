@@ -10,3 +10,8 @@ pypandoc
 pandoc
 black
 flake8
+torch>=2.0.0
+torchvision>=0.15.0
+tqdm
+matplotlib
+ultralytics>=8.0.0
