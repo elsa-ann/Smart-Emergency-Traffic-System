@@ -1,17 +1,17 @@
-# 🚑 Smart Emergency Traffic System (SETS)
+# Smart Emergency Traffic System (SETS)
 
 **AI‑powered traffic management system** that detects emergency vehicles and dynamically controls traffic lights using ensemble deep learning.
 
-## 👥 Authors
+## Authors
 - **Alifah Fai'zah Rufaidah** (140810240006)  
 - **Elsa Rizki Utami** (140810240040)  
 - **Adella Safitri Akmaliyah** (140810240094)  
 
-📌 Project submitted for AI course – Smart Emergency Traffic System (SETS).
+Project submitted for AI course – Smart Emergency Traffic System (SETS).
 
 ---
 
-## ✨ Features
+## Features
 
 | Feature                     | Description                                                                                   |
 |-----------------------------|-----------------------------------------------------------------------------------------------|
@@ -27,7 +27,7 @@
 
 ---
 
-## 📊 Performance Summary (Latest Evaluation)
+## Performance Summary (Latest Evaluation)
 
 | Component             | Accuracy | Inference time (avg) |
 |-----------------------|----------|----------------------|
@@ -36,12 +36,12 @@
 | Random Forest         | 83.33%   | 10.6 ms              |
 | **Ensemble OR**       | 84.13%   | 32.0 ms (end‑to‑end) |
 
-📈 **Average accuracy (4 components)** = **85.1%**  
-⚡ **Total system response time** ≈ 0.032 seconds per image (excluding UI rendering).
+**Average accuracy (4 components)** = **85.1%**  
+**Total system response time** ≈ 0.032 seconds per image (excluding UI rendering).
 
 ---
 
-## 🛠️ Requirements
+## Requirements
 
 - Python 3.10 or higher  
 - Webcam (optional, for live demo)  
@@ -49,7 +49,7 @@
 
 ---
 
-## 📦 Installation
+## Installation
 
 ```bash
 git clone https://github.com/your-username/Smart-Emergency-Traffic-System.git
