@@ -189,7 +189,7 @@ elif view == "Webcam AI":
 
             # --- Aturan Decision (OPEN_CORRIDOR / CAUTION / NO_ACTION) ---
             # Threshold tetap 85%
-            cnn_valid = cnn_emergency and (cnn_conf >= 0.85)
+            cnn_valid = cnn_emergency and (cnn_conf >= 0.95)
             yolo_valid = yolo_emergency and (yolo_conf >= 0.85)
 
             if cnn_valid or yolo_valid:
